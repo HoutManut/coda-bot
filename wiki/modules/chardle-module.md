@@ -59,17 +59,17 @@ Three tables. Mode is a *shape of rows*, not a class hierarchy — see
 
 ### `chardle_puzzles`
 
-| Column | Notes |
-|---|---|
-| `id` | |
-| `song_difficulty_id` | FK `song_difficulties`, `ON UPDATE CASCADE ON DELETE RESTRICT` — the answer |
-| `clue_columns` | frozen clue set. Named `clue_columns`, not `columns`, to stay clear of SQLAlchemy's `Table.columns`. Frozen here, not per-session, so a daily board is identical for everyone. **Membership only** — render order is the canonical constant sequence, capped at 7 counting `title` ([[chardle-clue-columns|Chardle — Clue Columns]]) |
-| `max_attempts` | 6 for dailies, pinned; **derived for err** (`min(max(⌊N/2⌋,1),6)`, N counted at creation with `include_hidden=True`, → 3 today); null (free) by default on free play, bounded by `/chardle play attempts:<int>` ≥ 1. Per-puzzle, never a constant |
-| `puzzle_number` | int, **unique, nullable**. Non-null ⇒ this is a daily |
-| `is_daily` | `GENERATED ALWAYS AS (puzzle_number IS NOT NULL) STORED`, plus `UNIQUE (id, is_daily)` — exists only so sessions can reach the fact through a composite FK |
-| `tier` | named tier the answer was drawn from. Also the err predicate (streak counts err, the histogram does not) and the gate for tier-specific columns |
-| `filters` | jsonb, nullable. Non-null ⇒ custom challenge ⇒ **stats-ineligible** |
-| `created_at` | |
+| Column               | Notes                                                                                                                                                                                                                                                                                                      |                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `id`                 |                                                                                                                                                                                                                                                                                                            |                           |
+| `song_difficulty_id` | FK `song_difficulties`, `ON UPDATE CASCADE ON DELETE RESTRICT` — the answer                                                                                                                                                                                                                                |                           |
+| `clue_columns`       | frozen clue set. Named `clue_columns`, not `columns`, to stay clear of SQLAlchemy's `Table.columns`. Frozen here, not per-session, so a daily board is identical for everyone. **Membership only** — render order is the canonical constant sequence, capped at 7 counting `title` ([[chardle-clue-columns | Chardle — Clue Columns]]) |
+| `max_attempts`       | 6 for dailies, pinned; **derived for err** (`min(max(⌊N/2⌋,1),6)`, N counted at creation with `include_hidden=True`, → 3 today); null (free) by default on free play, bounded by `/chardle play attempts:<int>` ≥ 1. Per-puzzle, never a constant                                                          |                           |
+| `puzzle_number`      | int, **unique, nullable**. Non-null ⇒ this is a daily                                                                                                                                                                                                                                                      |                           |
+| `is_daily`           | `GENERATED ALWAYS AS (puzzle_number IS NOT NULL) STORED`, plus `UNIQUE (id, is_daily)` — exists only so sessions can reach the fact through a composite FK                                                                                                                                                 |                           |
+| `tier`               | named tier the answer was drawn from. Also the err predicate (streak counts err, the histogram does not) and the gate for tier-specific columns                                                                                                                                                            |                           |
+| `filters`            | jsonb, nullable. Non-null ⇒ custom challenge ⇒ **stats-ineligible**                                                                                                                                                                                                                                        |                           |
+| `created_at`         |                                                                                                                                                                                                                                                                                                            |                           |
 
 - `CHECK (puzzle_number IS NULL OR filters IS NULL)` — a daily can never be filtered.
 - **`ON DELETE RESTRICT` on the answer FK is deliberate.** A puzzle is a historical record;

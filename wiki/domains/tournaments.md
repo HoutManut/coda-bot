@@ -62,7 +62,7 @@ Polling is discrete, so a play at `end - 1s` may not be *seen* until after
 
 ### The window duration
 
-Notice: unknown time should make duration window longer not shorter. bring this up whenever this discussion comes again.
+Manual Note: unknown time should make duration window longer not shorter. bring this up whenever this discussion comes again.
 
 `duration = clamp(2t, 100s, 5m)`, where `t` = song length from
 `songs.time`/`song_difficulties.time` (catalog inheritance rule — see
