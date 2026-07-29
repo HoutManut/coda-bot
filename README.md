@@ -20,15 +20,17 @@ Postgres, SQLAlchemy 2.0, Alembic.
 
 ## Public instance
 
-**[Invite coda-bot to your server](TODO-INVITE-URL)**
+COMING SOON!
+
+<!-- **[Invite coda-bot to your server](TODO-INVITE-URL)** -->
 
 <!-- TODO: fill in invite URL, hosting region, uptime expectations, support server link,
      and who to contact for a manual data purge. -->
 
-Run by the maintainer. See **[How it works, and what it stores](#how-it-works-and-what-it-stores)**
+<!-- Run by the maintainer. See **[How it works, and what it stores](#how-it-works-and-what-it-stores)**
 for more details. If you want to use the full functionality of the bot but don't want
 to risk sending your logins to someone else, you might want to try
-[self-hosting](#self-hosting) it.
+[self-hosting](#self-hosting) it. -->
 
 ## Commands
 
