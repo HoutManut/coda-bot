@@ -37,7 +37,7 @@ source lists exactly what not to port).
 
 - Friends live at `GET /webapi/friend/me`, **not** `/webapi/user/me` — lowiro removed the
   `friends` key from `/me`. **FACT.** Encoded in `src/coda/arcaea/endpoints.py` /
-  `dto/me.py` / `dto/friend.py` — see [[arcaea (module)]].
+  `dto/me.py` / `dto/friend.py` — see [[arcaea|arcaea (module)]].
 - Branch on the response **body** (`success` / `error_code`), never the HTTP status: 400 and
   404 both carry `{"success":false,"error_code":N}`. **FACT.** Encoded in
   `src/coda/arcaea/errors.py::raise_for_envelope`.
@@ -58,7 +58,7 @@ source lists exactly what not to port).
   (tournaments) rests on this.
 - `max_friend` starts at 10 on a fresh account, rises by 5 with play to a hard max of 25;
   **not** subscription-tied. **FACT** (both ladder endpoints observed) + **OWNER-STATED**
-  (the step trigger). Plan for 10/account — see [[sessions (module)]].
+  (the step trigger). Plan for 10/account — see [[sessions|sessions (module)]].
 - `add`/`delete` are asymmetric: `add` takes `friend_code`, `delete` takes `friend_id`
   (= `user_id`). **FACT.** `add_friend(code) -> arc_user_id` is **unimplementable** — no
   friend object ever carries the code that was submitted, so the caller must diff
@@ -66,13 +66,14 @@ source lists exactly what not to port).
 - `rating: -1` means the player hid their PTT, decoding naively to a corrupt `-0.01`.
   **FACT.** `score: 0` is a real score, not null. **FACT.** `showcase_characters` holds ints
   **or** dicts in the same response. **FACT.** All three are DTO-boundary sentinels — see
-  [[arcaea (module)]] §sentinels.
+  [[arcaea|arcaea (module)]] §sentinels.
 - `recent_score` shape for a never-played friend is **unverified** (`null`/`[]`/omitted all
   plausible) — **OWNER-STATED, sample had no unplayed account.** The shipped DTO treats
   `friend.get("recent_score") or []` as load-bearing regardless of which shape arrives.
-- `GET /webapi/score/song/me/all` being a **full per-play history** is **DISPUTED** — the
-  source's own evidence (count ≈ FTR chart count, aggregate fields on each row) argues it is
-  one row per (song, difficulty) — a per-chart record, not a log. Not yet re-captured.
+- `GET /webapi/score/song/me/all` is **one row per (song, difficulty), a per-chart record —
+  not a full per-play log. FACT**, re-captured 2026-07-23: replayed a chart for a strictly
+  worse attempt, row was unchanged except `yearly_play_count` incrementing. See
+  [[h-song-me-all-log-vs-record]] for the capture. (Was DISPUTED; resolved.)
 - Three data tiers exist and are gated **per route, not per prefix** — `total_ranking/world`
   is free while its sibling `total_ranking/friend` is subscription-only. **OWNER-STATED.**
 
@@ -91,11 +92,11 @@ source lists exactly what not to port).
   any source doc). This document is stale on that one point; see [[w-third-auth-envelope]].
 - The handoff notes reverse this document's design intent (not its wire facts) around the
   bot-code fake-not-found oracle — see [[w-honest-bot-code-refusal]] and the staleness note
-  on [[Registration]].
+  on [[registration|Registration]].
 
 ## Feeds
 
-[[Auth & Sessions]], [[arcaea (module)]], [[sessions (module)]], [[players]],
-[[Registration]], [[Session Lease]], [[w-formdata-504]],
+[[auth-and-sessions|Auth & Sessions]], [[arcaea|arcaea (module)]], [[sessions|sessions (module)]], [[players]],
+[[registration|Registration]], [[session-lease|Session Lease]], [[w-formdata-504]],
 [[w-friend-code-strip]], [[w-status-vs-body]], [[w-friends-key-removed]],
 [[w-third-auth-envelope]], [[w-release-order]]

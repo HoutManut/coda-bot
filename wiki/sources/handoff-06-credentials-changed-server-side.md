@@ -45,4 +45,4 @@ claims.
 
 ## Feeds
 
-`[[h-credentials-changed-server-side]]`
+[[h-credentials-changed-server-side]]

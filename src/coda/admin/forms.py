@@ -14,13 +14,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from starlette.datastructures import FormData
+from starlette.datastructures import FormData, UploadFile
 
-from coda.admin.presenters import parse_date, parse_time
+from coda.admin.presenters import parse_time
+from coda.utils.dates import combine_date, parse_date
 from coda.catalog.resolution import OVERRIDABLE_FIELDS
 
 _TRUE = {"true", "1", "yes", "on"}
 _FALSE = {"false", "0", "no", "off"}
+
+
+def form_text(form: FormData, name: str) -> str:
+    """Text-field value, blank if absent. Fails loudly if a file was posted instead."""
+    value = form.get(name)
+    if isinstance(value, UploadFile):
+        raise ValueError(f"expected text field {name!r}, got a file upload")
+    return value or ""
 
 
 def _to_bool(raw: str) -> bool:
@@ -49,25 +58,41 @@ def _checkbox(form: FormData, name: str) -> bool:
     return form.get(name) is not None
 
 
+def song_date(form: FormData) -> int:
+    """Song release second from the split date-picker + offset fields.
+
+    Falls back to a raw ``date`` field so a form posted without the split pair
+    (or with a pasted epoch) still parses.
+    """
+    day = form_text(form, "date_day").strip()
+    if not day:
+        return parse_date(form_text(form, "date")) or 0
+    try:
+        offset = int(form_text(form, "date_offset").strip() or 0)
+    except ValueError:
+        offset = 0
+    return combine_date(day, offset) or 0
+
+
 def parse_song_base(form: FormData) -> dict[str, Any]:
     """Concrete, fully-typed song-row values from the base song form."""
     return {
-        "pack_id": (form.get("pack_id") or "").strip() or None,
-        "pack_name": (form.get("pack_name") or "").strip(),
-        "name_en": (form.get("name_en") or "").strip(),
-        "name_jp": (form.get("name_jp") or "").strip(),
-        "artist": (form.get("artist") or "").strip(),
-        "bpm": (form.get("bpm") or "").strip(),
-        "bpm_base": float(form.get("bpm_base") or 0),
-        "time": parse_time(form.get("time") or ""),
-        "side": int(form.get("side") or 0),
+        "pack_id": form_text(form, "pack_id").strip() or None,
+        "pack_name": form_text(form, "pack_name").strip(),
+        "name_en": form_text(form, "name_en").strip(),
+        "name_jp": form_text(form, "name_jp").strip(),
+        "artist": form_text(form, "artist").strip(),
+        "bpm": form_text(form, "bpm").strip(),
+        "bpm_base": float(form_text(form, "bpm_base") or 0),
+        "time": parse_time(form_text(form, "time")),
+        "side": int(form_text(form, "side") or 0),
         "world_unlock": _checkbox(form, "world_unlock"),
         "remote_download": _checkbox(form, "remote_download"),
-        "bg": (form.get("bg") or "").strip(),
-        "date": parse_date(form.get("date") or "") or 0,
-        "version": (form.get("version") or "").strip(),
-        "jacket": (form.get("jacket") or "").strip(),
-        "jacket_designer": (form.get("jacket_designer") or "").strip() or None,
+        "bg": form_text(form, "bg").strip(),
+        "date": song_date(form),
+        "version": form_text(form, "version").strip(),
+        "jacket": form_text(form, "jacket").strip(),
+        "jacket_designer": form_text(form, "jacket_designer").strip() or None,
     }
 
 
@@ -75,10 +100,10 @@ def parse_overrides(form: FormData) -> dict[str, Any]:
     """Overridable difficulty fields: blank -> ``None`` (inherit), else typed."""
     out: dict[str, Any] = {}
     for field in OVERRIDABLE_FIELDS:
-        raw = form.get(field)
-        if raw is None or raw.strip() == "":
+        raw = form_text(form, field).strip()
+        if raw == "":
             out[field] = None
             continue
         coerce = _COERCE.get(field)
-        out[field] = coerce(raw.strip()) if coerce else raw.strip()
+        out[field] = coerce(raw) if coerce else raw
     return out

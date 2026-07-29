@@ -32,7 +32,7 @@ _FIELD_LIMIT = 1024
 
 def console_formatter() -> logging.Formatter:
     """hikari-style coloured console formatter."""
-    return colorlog.formatter.ColoredFormatter(_CONSOLE_FORMAT)
+    return colorlog.ColoredFormatter(_CONSOLE_FORMAT)
 
 
 def file_formatter() -> logging.Formatter:

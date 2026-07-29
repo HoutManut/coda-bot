@@ -17,16 +17,18 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coda.admin import aliassync
 from coda.admin.deps import get_session
+from coda.admin.forms import form_text
 from coda.admin.listing import paginate
-from coda.admin.presenters import display_date, parse_date
+from coda.utils.dates import display_date, parse_date
 from coda.admin.templating import templates
 from coda.catalog.aliases import entity_alias_terms
+from coda.catalog.entity_id import clean_entity_id
 from coda.db.enums import ArtistKind
 from coda.db.models import (
     Artist,
@@ -185,15 +187,16 @@ async def _detail(
             g["diffs"].add(difficulty)
         # Total chart count per involved song — to drop the badges when the
         # charter covers the whole song (full credit needs no per-chart detail).
-        totals = dict(
-            (
+        totals = {
+            sid: count
+            for sid, count in (
                 await session.execute(
                     select(SongDifficulty.song_id, func.count())
                     .where(SongDifficulty.song_id.in_({sid for sid, _ in groups}))
                     .group_by(SongDifficulty.song_id)
                 )
             ).all()
-        ) if groups else {}
+        } if groups else {}
         responsible_songs = sorted(groups.values(), key=lambda g: (g["idx"], g["date"]))
         for g in responsible_songs:
             g["total"] = totals.get(g["song_id"], 0)
@@ -314,8 +317,8 @@ async def _detail(
 
 async def _create(spec: _Spec, request: Request, session: AsyncSession) -> RedirectResponse:
     form = await request.form()
-    eid = (form.get("id") or "").strip()
-    name = (form.get("name") or "").strip()
+    eid = form_text(form, "id").strip()
+    name = form_text(form, "name").strip()
     if not eid or not name:
         return _redirect(f"/{spec.kind}", "id and name are required.")
     if await session.get(spec.entity, eid):
@@ -333,7 +336,7 @@ async def _update(spec: _Spec, request: Request, eid: str, session: AsyncSession
         return _redirect(f"/{spec.kind}", "not found.")
     form = await request.form()
     old_name = entity.name
-    entity.name = (form.get("name") or "").strip()
+    entity.name = form_text(form, "name").strip()
     if spec.has_kind:
         # Checkbox: present (any value) = unit, absent = person.
         entity.kind = ArtistKind.UNIT if form.get("kind") else ArtistKind.PERSON
@@ -350,7 +353,7 @@ async def _rename(spec: _Spec, request: Request, eid: str, session: AsyncSession
     if entity is None:
         return _redirect(f"/{spec.kind}", "not found.")
     form = await request.form()
-    new_id = (form.get("new_id") or "").strip()
+    new_id = form_text(form, "new_id").strip()
     if not new_id:
         return _redirect(f"/{spec.kind}/{eid}", "New id is required.")
     if new_id == eid:
@@ -395,7 +398,7 @@ async def _delete(spec: _Spec, eid: str, session: AsyncSession) -> RedirectRespo
 async def _merge(spec: _Spec, request: Request, eid: str, session: AsyncSession) -> RedirectResponse:
     """Fold source ``eid`` into the target id from the form."""
     form = await request.form()
-    target = (form.get("target") or "").strip()
+    target = form_text(form, "target").strip()
     if not target or target == eid:
         return _redirect(f"/{spec.kind}/{eid}", "pick a different target to merge into.")
     src = await session.get(spec.entity, eid)
@@ -525,7 +528,7 @@ async def add_member(
     if await session.get(Artist, eid) is None:
         return _redirect("/artists", "not found.")
     form = await request.form()
-    mid = (form.get("id") or "").strip()
+    mid = form_text(form, "id").strip()
     if not mid or mid == eid:
         return _redirect(f"/artists/{eid}", "pick a different artist as member.")
     if await session.get(Artist, mid) is None:
@@ -553,6 +556,120 @@ async def remove_member(
 
 # --- song <-> entity linking (used from the song detail page) -------------
 
+async def _existing_match(
+    spec: _Spec, session: AsyncSession, text: str
+) -> str | None:
+    """Id of an entity already matching ``text`` on name, id, or alias.
+
+    Case-insensitive, and it checks aliases because those are what the picker
+    and the bot both resolve against -- this is the cheap prevention for the
+    duplicate-entity problem the destructive ``_merge`` route exists to clean up
+    after.
+    """
+    needle = text.strip().lower()
+    if not needle:
+        return None
+    id_col = getattr(spec.entity, spec.id_col)
+    hit = await session.scalar(
+        select(id_col).where(
+            or_(func.lower(spec.entity.name) == needle, func.lower(id_col) == needle)
+        )
+    )
+    if hit:
+        return hit
+    return await session.scalar(
+        select(getattr(spec.alias_model, spec.id_col)).where(
+            func.lower(spec.alias_model.alias) == needle
+        )
+    )
+
+
+async def _create_entity(
+    spec: _Spec, session: AsyncSession, form
+) -> tuple[str | None, str]:
+    """Insert a new artist/charter from a create form. Returns ``(id, error)``.
+
+    The alias sync is not optional: a bare INSERT leaves the new entity
+    unsearchable, since aliases are what the picker and the bot's resolution
+    both read.
+    """
+    name = form_text(form, "name").strip()
+    eid = form_text(form, "id").strip() or clean_entity_id(name)
+    if not name or not eid:
+        return None, "name is required."
+
+    duplicate = await _existing_match(spec, session, name)
+    if duplicate is None and eid != name:
+        duplicate = await _existing_match(spec, session, eid)
+    if duplicate is not None:
+        return None, (
+            f"{spec.kind[:-1]} {duplicate!r} already matches {name!r} — link it instead."
+        )
+
+    session.add(spec.entity(**{spec.id_col: eid, "name": name}))
+    await session.flush()
+    await spec.sync(session, eid, new_name=name)
+    return eid, ""
+
+
+@router.post("/songs/{song_id}/{kind}/create")
+async def create_and_link_to_song(
+    song_id: str, kind: str, request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    """Create an artist/charter and link it to the song in one round trip.
+
+    One endpoint rather than a client-side create-then-link, which can half-fail
+    and leave an unlinked entity behind.
+    """
+    spec = _SPECS.get(kind)
+    if spec is None:
+        return HTMLResponse("Unknown kind", status_code=404)
+
+    eid, error = await _create_entity(spec, session, await request.form())
+    if eid is None:
+        await session.rollback()
+        return _redirect(f"/songs/{song_id}", error)
+
+    await session.execute(
+        pg_insert(spec.junction)
+        .values([{"song_id": song_id, spec.id_col: eid}])
+        .on_conflict_do_nothing(index_elements=["song_id", spec.id_col])
+    )
+    await session.commit()
+    return _redirect(f"/songs/{song_id}#links")
+
+
+@router.post("/difficulties/{difficulty_id}/{kind}/create")
+async def create_and_link_to_difficulty(
+    difficulty_id: int, kind: str, request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    """Create an artist/charter and link it to one chart's override set.
+
+    ``kind`` is singular here (``artist``/``charter``), matching the rest of the
+    per-difficulty routes.
+    """
+    entry = _DIFF_JUNCTION.get(kind)
+    if entry is None:
+        return HTMLResponse("Unknown kind", status_code=404)
+    junction, spec = entry
+
+    back = await _diff_back(difficulty_id, session)
+    eid, error = await _create_entity(spec, session, await request.form())
+    if eid is None:
+        await session.rollback()
+        return _redirect(back, error)
+
+    await session.execute(
+        pg_insert(junction)
+        .values([{"difficulty_id": difficulty_id, spec.id_col: eid}])
+        .on_conflict_do_nothing(index_elements=["difficulty_id", spec.id_col])
+    )
+    await session.commit()
+    return _redirect(back)
+
+
 @router.post("/songs/{song_id}/{kind}")
 async def link_to_song(
     song_id: str, kind: str, request: Request, session: AsyncSession = Depends(get_session)
@@ -561,7 +678,7 @@ async def link_to_song(
     if spec is None:
         return HTMLResponse("Unknown kind", status_code=404)
     form = await request.form()
-    eid = (form.get("id") or "").strip()
+    eid = form_text(form, "id").strip()
     if not eid or not await session.get(spec.entity, eid):
         return _redirect(f"/songs/{song_id}", f"no such {spec.kind[:-1]}: {eid!r}")
     stmt = pg_insert(spec.junction).values([{"song_id": song_id, spec.id_col: eid}])
@@ -631,7 +748,7 @@ async def link_to_difficulty(
         return HTMLResponse("Unknown kind", status_code=404)
     junction, spec = entry
     form = await request.form()
-    eid = (form.get("id") or "").strip()
+    eid = form_text(form, "id").strip()
     if not eid or not await session.get(spec.entity, eid):
         return _redirect(await _diff_back(difficulty_id, session), f"no such {kind}: {eid!r}")
     stmt = pg_insert(junction).values([{"difficulty_id": difficulty_id, spec.id_col: eid}])
@@ -679,17 +796,17 @@ async def list_packs(request: Request, session: AsyncSession = Depends(get_sessi
 
 def _pack_fields(form) -> dict:
     return {
-        "name": (form.get("name") or "").strip(),
-        "description": (form.get("description") or "").strip() or None,
-        "cover_art": (form.get("cover_art") or "").strip() or None,
-        "release_date": parse_date(form.get("release_date") or ""),
+        "name": form_text(form, "name").strip(),
+        "description": form_text(form, "description").strip() or None,
+        "cover_art": form_text(form, "cover_art").strip() or None,
+        "release_date": parse_date(form_text(form, "release_date")),
     }
 
 
 @router.post("/packs")
 async def create_pack(request: Request, session: AsyncSession = Depends(get_session)):
     form = await request.form()
-    pid = (form.get("pack_id") or "").strip()
+    pid = form_text(form, "pack_id").strip()
     if not pid:
         return _redirect("/packs", "pack_id required.")
     if await session.get(Pack, pid):
@@ -745,7 +862,7 @@ async def rename_pack(
     if pack is None:
         return HTMLResponse("Not found", status_code=404)
     form = await request.form()
-    new_id = (form.get("new_id") or "").strip()
+    new_id = form_text(form, "new_id").strip()
     if not new_id:
         return _redirect(f"/packs/{pack_id}", "New pack_id is required.")
     if new_id == pack_id:
@@ -763,7 +880,7 @@ async def rename_pack(
 async def delete_pack(pack_id: str, session: AsyncSession = Depends(get_session)):
     # Detach songs (FK is nullable) rather than cascade-deleting the catalog.
     await session.execute(
-        Song.__table__.update().where(Song.pack_id == pack_id).values(pack_id=None)
+        update(Song).where(Song.pack_id == pack_id).values(pack_id=None)
     )
     await session.execute(delete(Pack).where(Pack.pack_id == pack_id))
     await session.commit()

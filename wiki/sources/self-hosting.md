@@ -56,4 +56,4 @@ with the shipped `scripts/seed_bot_account.py` / `alembic.ini` +
 
 ## Feeds
 
-`[[db]]`, `[[h-manual-bot-account-creation]]`
+[[db]], [[h-manual-bot-account-creation]]

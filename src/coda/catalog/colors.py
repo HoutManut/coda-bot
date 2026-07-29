@@ -1,8 +1,7 @@
-"""App-wide Arcaea colours, keyed by domain enum. Reused across extensions;
+"""App-wide Arcaea colors, keyed by domain enum. Reused across extensions;
 never redefined per command. Stored as Discord-embed ints.
 
-Shared values are deliberate: err reuses Future, Light reuses Past, and
-Colorless/Lephon share one tint.
+Shared values are deliberate.
 """
 
 from __future__ import annotations

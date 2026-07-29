@@ -51,5 +51,5 @@ reverse any source-doc claim.
 
 ## Feeds
 
-`[[Live Updates]]`, `[[h-live-update-post-filters]]`,
-`[[h-recent-duplicate-suppression]]`
+[[live-updates|Live Updates]], [[h-live-update-post-filters]],
+[[h-recent-duplicate-suppression]]

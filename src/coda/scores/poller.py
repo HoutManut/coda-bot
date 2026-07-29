@@ -2,16 +2,16 @@
 
 Both paths run in one cycle, each with its own unit (``scores/keys.py``): the
 friend path polls a BOT ACCOUNT -- one ``/friend/me`` returns every friend it
-holds, so ~5 requests cover the whole user base -- and the own path polls a
-credentialed PLAYER, one ``/user/me`` each, which is the only source of
-pure/far/lost. Both feed the same ingest, which collapses a play seen on both
-onto one row.
+holds, and the own path polls a credentialed PLAYER, one ``/user/me`` each,
+which is the only source of pure/far/lost. The paths do not overlap: a player
+the own path covers is dropped from the friend path's results (``_friend_scores``),
+so exactly one path authors any given play.
 
 Traffic shape is deliberate. A fixed-period sweep firing every account
 back-to-back from one IP is the most script-shaped pattern possible against an
 API Cloudflare fronts, and the bot accounts are hand-made and unreplaceable. So
 each key keeps its own due time (``scores/schedule.py``), jittered and nudged
-apart from its neighbours, and a tick normally polls one key. Slow and irregular
+apart from its neighbors, and a tick normally polls one key. Slow and irregular
 beats fast and metronomic -- scores are read minutes after the fact at worst, and
 an impatient user has ``/recent``, which refreshes just their own account on
 demand.
@@ -37,6 +37,7 @@ from coda.players.session import PlayerSessionProvider
 from coda.scores.coordinator import PollCoordinator
 from coda.scores.keys import BOT, OWN, PollKey
 from coda.scores.observations import ObservationCache
+from coda.scores.poster import PostQueue, submit
 from coda.scores.schedule import PollSchedule
 from coda.scores.service import ScoreStore
 from coda.sessions.pool import SessionPool
@@ -51,23 +52,30 @@ logger = logging.getLogger(__name__)
 # account is polled and a user is waiting on it.
 STAGGER = (3.0, 12.0)
 
+# What one path saw: the recent plays, plus every account it covered mapped to
+# its live PTT (None = the player hides it). Ratings are reported for accounts
+# with no recent play too -- "no play" says nothing about whether PTT is hidden.
+type _Observed = tuple[list[ScoreResult], dict[int, float | None]]
+
 
 async def run(
     coordinator: PollCoordinator,
     observations: ObservationCache,
     app: hikari.RESTAware,
+    posts: PostQueue | None = None,
     *,
     interval: float | None = None,
 ) -> None:
     """Poll forever: sleep until the earliest key is due, poll it, signal waiters.
 
     Periodic polling is gated by the bot-wide ``polling`` config key, read fresh
-    every tick so ``/config global polling on|off`` takes effect within one
+    every tick so ``/run config set polling on|off`` takes effect within one
     interval and never needs a restart. With it off, due keys are pushed forward
     unpolled -- the clock keeps running and no requests are spent; an on-demand
     refresh (``/recent``) still runs, which is exactly on-demand-only.
     """
-    schedule = PollSchedule(config.poll_interval if interval is None else interval)
+    schedule = PollSchedule(
+        config.poll_interval if interval is None else interval)
     store = ScoreStore()
 
     while True:
@@ -85,9 +93,12 @@ async def run(
         covered: set[PollKey] = set()
         try:
             if periodic and not await _polling_enabled():
-                logger.debug("polling is off; skipping %d due key(s)", len(keys))
+                logger.debug(
+                    "polling is off; skipping %d due key(s)", len(keys))
             else:
-                covered = await _run_cycle(store, observations, keys, app, periodic)
+                covered = await _run_cycle(
+                    store, observations, keys, app, periodic, posts
+                )
         except Exception:
             logger.exception("poll cycle failed; retrying next tick")
         finally:
@@ -116,6 +127,7 @@ async def _run_cycle(
     keys: list[PollKey],
     app: hikari.RESTAware,
     periodic: bool,
+    posts: PostQueue | None,
 ) -> set[PollKey]:
     """Poll the given keys and return the ones actually reached.
 
@@ -133,7 +145,7 @@ async def _run_cycle(
         if periodic and index:
             await asyncio.sleep(random.uniform(*STAGGER))
         try:
-            seen, new = await _poll_key(store, observations, key, app)
+            seen, new = await _poll_key(store, observations, key, app, posts)
         except ArcaeaError:
             # One bad key never blocks the others, and stays uncovered.
             logger.exception("poll: %s failed; skipping", key)
@@ -142,13 +154,13 @@ async def _run_cycle(
         total_scores += seen
         total_new += new
 
-    # new_plays is the live-updates poster's input (doc 08); no consumer yet.
     logger.info(
         "poll cycle (%s): %d key(s), %d recent score(s), %d new play(s)",
         "scheduled" if periodic else "on-demand",
         len(covered),
         total_scores,
         total_new,
+        extra={'file': total_new > 0}
     )
     return covered
 
@@ -163,9 +175,10 @@ async def _pollable_keys(app: hikari.RESTAware) -> dict[PollKey, bool]:
     stored row. The same filter must not move into
     ``PlayerSessionProvider._pollable``, which ``session_for`` shares.
 
-    The friend path has no equivalent: one ``/friend/me`` covers every friend of
-    a bot account, so there is nothing to skip. ``ingest`` is what enforces the
-    opt-out for both.
+    The friend path has no equivalent KEY to skip: one ``/friend/me`` covers
+    every friend of a bot account, so the request is spent either way -- it
+    filters its RESULTS instead (``_friend_scores``). ``ingest`` is what enforces
+    the tracking opt-out for both.
     """
     async with async_session() as db:
         keys: dict[PollKey, bool] = {
@@ -181,6 +194,7 @@ async def _poll_key(
     observations: ObservationCache,
     key: PollKey,
     app: hikari.RESTAware,
+    posts: PostQueue | None,
 ) -> tuple[int, int]:
     """Poll one key on whichever path owns it. Returns (seen, new).
 
@@ -191,26 +205,66 @@ async def _poll_key(
     namespace, target_id = key
     async with async_session() as db:
         if namespace == BOT:
-            results = await _friend_scores(db, target_id)
+            results, ratings = await _friend_scores(db, target_id, app)
         else:
-            results = await _own_scores(db, target_id, app)
-        return len(results), len(await _store(store, observations, db, results))
+            results, ratings = await _own_scores(db, target_id, app)
+        for arc_user_id, rating in ratings.items():
+            observations.record_rating(arc_user_id, rating)
+        new_play_ids = await _store(store, observations, db, results)
+
+    # Submitted outside the session: the poster opens its own, and a wedged
+    # poster must never hold this one open. Non-blocking by construction.
+    submit(posts, new_play_ids)
+    return len(results), len(new_play_ids)
 
 
-async def _friend_scores(db: AsyncSession, bot_account_id: int) -> list[ScoreResult]:
-    """Every friend's recent play from one bot account, tier-1 detail."""
+async def _friend_scores(
+    db: AsyncSession, bot_account_id: int, app: hikari.RESTAware
+) -> _Observed:
+    """Every friend's recent play from one bot account, tier-1 detail.
+
+    Plays of players the own path covers are DROPPED, not merged. Both paths
+    see the same play, and whichever lands first is the one that gets inserted,
+    posted and cached -- so a friend sighting winning that race publishes a play
+    with no note counts, health or clear type, and the own sighting that follows
+    enriches the row silently, too late to fix the post or the cache. Yielding
+    is what makes the own path the sole author of those players' plays.
+
+    The cost is one play per own-poll interval: a player who finishes a second
+    chart before their own key comes due loses the first, since ``/user/me``
+    only ever returns the latest. Accepted -- the own path is also the only
+    thing that can tell a hard-gauge death from a low score, so a dropped play
+    would have been recorded wrong anyway.
+
+    Ratings are reported for every friend regardless: a PTT reading is
+    current state, not a play, and a second sighting of it costs nothing.
+    """
     session = await SessionPool(db).get(bot_account_id)
     if session is None:
-        logger.debug("poll: bot account %s no longer active; skipping", bot_account_id)
-        return []
+        logger.debug(
+            "poll: bot account %s no longer active; skipping", bot_account_id)
+        return [], {}
 
     friends = parse_friends(await session.call(endpoints.fetch_friends))
-    return [f.recent_score for f in friends if f.recent_score is not None]
+    plays = [f.recent_score for f in friends if f.recent_score is not None]
+    covered = await PlayerSessionProvider(db, app).own_covered(
+        p.arc_user_id for p in plays
+    )
+    if covered:
+        logger.debug(
+            "poll: bot account %s yielding %d play(s) to the own path",
+            bot_account_id,
+            sum(p.arc_user_id in covered for p in plays),
+        )
+    return (
+        [p for p in plays if p.arc_user_id not in covered],
+        {f.arc_user_id: f.rating for f in friends},
+    )
 
 
 async def _own_scores(
     db: AsyncSession, arcaea_account_id: int, app: hikari.RESTAware
-) -> list[ScoreResult]:
+) -> _Observed:
     """One credentialed player's own recent play, full detail.
 
     A terminal 403 has already flipped ``is_valid=False`` -- durably, in the
@@ -221,8 +275,9 @@ async def _own_scores(
     provider = PlayerSessionProvider(db, app)
     pair = await provider.session_for(arcaea_account_id)
     if pair is None:
-        logger.debug("poll: account %s has no usable login; skipping", arcaea_account_id)
-        return []
+        logger.debug(
+            "poll: account %s has no usable login; skipping", arcaea_account_id)
+        return [], {}
 
     account, session = pair
     try:
@@ -231,7 +286,8 @@ async def _own_scores(
         await provider.handle_invalid(account)
         raise
 
-    return [] if me.recent_score is None else [me.recent_score]
+    scores = [] if me.recent_score is None else [me.recent_score]
+    return scores, {me.arc_user_id: me.rating}
 
 
 async def _store(
@@ -239,19 +295,25 @@ async def _store(
     observations: ObservationCache,
     db: AsyncSession,
     results: list[ScoreResult],
-) -> list[ScoreResult]:
-    """Resolve each play's chart and ingest; return the genuinely-new ones.
+) -> list[int]:
+    """Resolve each play's chart and ingest; return the genuinely-new row ids.
 
     Every resolved play is recorded in the observation cache first, whether or
     not ``ingest`` goes on to store it: an account with tracking off gets no row,
     and the cache is the only thing ``/recent`` can then show it.
+
+    Sorted by ``time_played`` before ingest, not after: ``ingest`` preserves
+    input order, so this is what makes the returned ids -- and therefore the
+    live feed -- read in the order the plays actually happened. One friend-path
+    cycle can yield many plays at once, and iteration order is not that order.
     """
     resolved = [
         replace(r, difficulty_id=await resolve_chart(db, r.song_id, r.difficulty))
         for r in results
     ]
+    resolved.sort(key=lambda r: r.time_played)
     for result in resolved:
         observations.record(result)
-    new_plays = await store.ingest(db, resolved)
+    new_play_ids = await store.ingest(db, resolved)
     await db.commit()  # ingest does not commit
-    return new_plays
+    return new_play_ids

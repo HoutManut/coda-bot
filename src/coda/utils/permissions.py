@@ -77,6 +77,64 @@ def can_send_in(
     None means the cache could not answer -- not False. Refusing on a cache miss
     would reject legitimate choices whenever the cache is cold.
     """
+    return _has(app, channel_id, member, hikari.Permissions.SEND_MESSAGES)
+
+
+def can_view(
+    app: hikari.CacheAware,
+    channel_id: int,
+    member: hikari.Member,
+) -> bool | None:
+    """Whether ``member`` can see ``channel_id`` at all.
+
+    Asked of a *parent* channel before putting something in a thread under it:
+    thread access is inherited, so a member who cannot view the parent cannot
+    reach the thread either -- being added to a private thread does not grant it.
+
+    None means the cache could not answer, same contract as :func:`can_send_in`.
+    """
+    return _has(app, channel_id, member, hikari.Permissions.VIEW_CHANNEL)
+
+
+def everyone_can_view(app: hikari.CacheAware, channel_id: int) -> bool | None:
+    """Whether ``channel_id`` is visible to the guild by default.
+
+    Asked of a channel about to become everyone's destination, where the
+    per-member :func:`can_view` cannot help: it answers for the caller, and the
+    caller is an admin who can see everything.
+
+    False does **not** mean nobody else can see it -- a role overwrite can grant
+    VIEW_CHANNEL back to a subset, which is the ordinary "@everyone denied,
+    Member allowed" server. It means the channel is not open by default, which
+    is worth saying out loud and not worth refusing over. None, as elsewhere, is
+    the cache declining to answer.
+    """
+    channel = app.cache.get_guild_channel(channel_id)
+    if channel is None:
+        return None
+
+    # The @everyone role's id is the guild's, and so is its overwrite's.
+    everyone = app.cache.get_role(channel.guild_id)
+    if everyone is None:
+        return None
+
+    perms = everyone.permissions
+    if perms & hikari.Permissions.ADMINISTRATOR:
+        return True
+
+    overwrite = channel.permission_overwrites.get(channel.guild_id)
+    if overwrite is not None:
+        perms &= ~overwrite.deny
+        perms |= overwrite.allow
+    return bool(perms & hikari.Permissions.VIEW_CHANNEL)
+
+
+def _has(
+    app: hikari.CacheAware,
+    channel_id: int,
+    member: hikari.Member,
+    permission: hikari.Permissions,
+) -> bool | None:
     channel = app.cache.get_guild_channel(channel_id)
     if channel is None:
         return None
@@ -89,5 +147,4 @@ def can_send_in(
     if not roles:
         return None
 
-    perms = permissions_in(channel, member, roles)
-    return bool(perms & hikari.Permissions.SEND_MESSAGES)
+    return bool(permissions_in(channel, member, roles) & permission)

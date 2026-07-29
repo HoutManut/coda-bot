@@ -1,4 +1,8 @@
-"""Bot configuration commands: /config user|channel|server|global [key] [value]."""
+"""Bot configuration commands: /config user|channel|server [key] [value].
+
+Bot-wide settings live on ``/run``, not here: this surface is the public
+picker, and everything it lists is a name every user can read.
+"""
 
 from __future__ import annotations
 
@@ -8,38 +12,37 @@ import hikari
 import lightbulb
 from sqlalchemy import or_, select
 
-from coda.config import config
 from coda.db.session import async_session
-from coda.settings import REGISTRY, ConfigService, Scope
+from coda.settings import ConfigService, Scope, parse_value, user_keys
 from coda.settings.model import ConfigValue
 from coda.settings.service import GLOBAL_SCOPE_ID
 
 loader = lightbulb.Loader()
 config_group = lightbulb.Group("config", "Bot configuration")
 
-# Per-scope key choice lists, computed once at import time.
-_KEYS_USER = [lightbulb.Choice(name=k, value=k) for k, d in REGISTRY.items() if Scope.USER in d.settable_scopes]
-_KEYS_CHANNEL = [lightbulb.Choice(name=k, value=k) for k, d in REGISTRY.items() if Scope.CHANNEL in d.settable_scopes]
-_KEYS_GUILD = [lightbulb.Choice(name=k, value=k) for k, d in REGISTRY.items() if Scope.GUILD in d.settable_scopes]
-_KEYS_GLOBAL = [lightbulb.Choice(name=k, value=k) for k, d in REGISTRY.items() if Scope.GLOBAL in d.settable_scopes]
-_KEYS_VIEW = [lightbulb.Choice(name="all", value="all")] + [lightbulb.Choice(name=k, value=k) for k in REGISTRY]
+# Per-scope key choice lists, computed once at import time. Every one of them
+# is built from user_keys() -- an owner key must never reach this picker.
+_USER_KEYS = user_keys()
+_KEYS_USER = [lightbulb.Choice(name=k, value=k) for k, d in _USER_KEYS.items() if Scope.USER in d.settable_scopes]
+_KEYS_CHANNEL = [lightbulb.Choice(name=k, value=k) for k, d in _USER_KEYS.items() if Scope.CHANNEL in d.settable_scopes]
+_KEYS_GUILD = [lightbulb.Choice(name=k, value=k) for k, d in _USER_KEYS.items() if Scope.GUILD in d.settable_scopes]
+_KEYS_VIEW = [lightbulb.Choice(name="all", value="all")] + [lightbulb.Choice(name=k, value=k) for k in _USER_KEYS]
+
+_NEUTRAL_COLOR = 0x99AAB5
 
 _SCOPE_COLOR: dict[Scope, int] = {
-    Scope.GLOBAL:  0xED4245,
     Scope.GUILD:   0x5865F2,
     Scope.CHANNEL: 0x57F287,
     Scope.USER:    0xEB459E,
 }
 
 _SCOPE_LABEL: dict[Scope, str] = {
-    Scope.GLOBAL:  "bot-wide",
     Scope.GUILD:   "for this server",
     Scope.CHANNEL: "for this channel",
     Scope.USER:    "for you",
 }
 
 _SCOPE_TITLE: dict[Scope, str] = {
-    Scope.GLOBAL:  "Bot-wide settings",
     Scope.GUILD:   "Server settings",
     Scope.CHANNEL: "Channel settings",
     Scope.USER:    "Your settings",
@@ -48,7 +51,7 @@ _SCOPE_TITLE: dict[Scope, str] = {
 
 async def _ac_value(ctx: lightbulb.AutocompleteContext[str]) -> None:
     key_opt = ctx.get_option("key")
-    defn = REGISTRY.get(str(key_opt.value)) if key_opt and key_opt.value else None
+    defn = _USER_KEYS.get(str(key_opt.value)) if key_opt and key_opt.value else None
     if defn is None or defn.choices is None:
         await ctx.respond([])
         return
@@ -100,12 +103,15 @@ async def _handle(
     if key is hikari.UNDEFINED:
         async with async_session() as session:
             all_vals = await svc.all_at_scope(session, scope, scope_id)
-        desc = "\n".join(f"**{k}**: `{v}`" for k, v in sorted(all_vals.items())) or f"*Nothing customized {label} yet.*"
+        # The query returns whatever is in the DB, so the filter goes on the
+        # render -- an owner key written before it was marked one still shows up.
+        visible = {k: v for k, v in all_vals.items() if k in _USER_KEYS}
+        desc = "\n".join(f"**{k}**: `{v}`" for k, v in sorted(visible.items())) or f"*Nothing customized {label} yet.*"
         embed = hikari.Embed(title=_SCOPE_TITLE[scope], description=desc, color=color)
         await ctx.respond(embed=embed, ephemeral=True)
         return
 
-    defn = REGISTRY.get(key)
+    defn = _USER_KEYS.get(key)
     if defn is None:
         await ctx.respond(f"Unknown setting: `{key}`", ephemeral=True)
         return
@@ -130,16 +136,17 @@ async def _handle(
         menu.attach_persistent(ctx.client, timeout=60)
         return
 
-    if isinstance(defn.type, tuple) and value not in defn.type:
-        valid = ", ".join(f"`{c}`" for c in defn.type)
-        await ctx.respond(f"That's not a valid option for **{key}**. Choose from: {valid}", ephemeral=True)
+    try:
+        parsed = parse_value(defn, value)
+    except ValueError as err:
+        await ctx.respond(str(err), ephemeral=True)
         return
 
     async with async_session() as session:
-        await svc.set_value(session, key, scope, scope_id, value, int(ctx.user.id))
+        await svc.set_value(session, key, scope, scope_id, parsed, int(ctx.user.id))
     embed = (
         hikari.Embed(title="Saved!", color=color)
-        .add_field(defn.description or key, f"`{value}`")
+        .add_field(defn.description or key, f"`{parsed}`")
         .add_field("Applies", label)
     )
     await ctx.respond(embed=embed, ephemeral=True)
@@ -220,28 +227,6 @@ class ConfigServer(
 
 @loader.command
 @config_group.register
-class ConfigGlobal(
-    lightbulb.SlashCommand,
-    name="global",
-    description="Bot-wide defaults (bot owner only)",
-):
-    key: hikari.UndefinedOr[str] = lightbulb.string(
-        "key", "Setting to view or change", default=hikari.UNDEFINED, choices=_KEYS_GLOBAL
-    )
-    value: hikari.UndefinedOr[str] = lightbulb.string(
-        "value", "New value", default=hikari.UNDEFINED, autocomplete=_ac_value
-    )
-
-    @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context, svc: ConfigService) -> None:
-        if ctx.user.id not in config.owner_ids:
-            await ctx.respond("Bot-wide settings can only be changed by the bot owner.", ephemeral=True)
-            return
-        await _handle(ctx, svc, Scope.GLOBAL, GLOBAL_SCOPE_ID, self.key, self.value)
-
-
-@loader.command
-@config_group.register
 class ConfigView(
     lightbulb.SlashCommand,
     name="view",
@@ -263,7 +248,10 @@ class ConfigView(
             scope_id_map[Scope.CHANNEL] = channel_id
 
         single_key = None if self.key == "all" else self.key
-        keys_to_show = {single_key: REGISTRY[single_key]} if single_key else REGISTRY
+        if single_key is not None and single_key not in _USER_KEYS:
+            await ctx.respond(f"Unknown setting: `{single_key}`", ephemeral=True)
+            return
+        keys_to_show = {single_key: _USER_KEYS[single_key]} if single_key else _USER_KEYS
 
         # resolved_src per key, used for color when viewing a single key
         resolved_srcs: dict[str, Scope | None] = {}
@@ -294,14 +282,18 @@ class ConfigView(
                         break
 
                 resolved_srcs[key] = resolved_src
-                src_label = resolved_src.value if resolved_src else "default"
+                # A value inherited from the bot-wide row IS the default as far
+                # as this surface is concerned -- the global scope has no
+                # user-facing name and nothing here can write it.
+                src_label = (
+                    "default"
+                    if resolved_src is None or resolved_src is Scope.GLOBAL
+                    else resolved_src.value
+                )
                 lines.append(f"**{key}**: `{resolved_val}` *(from {src_label})*")
 
-        if single_key:
-            src = resolved_srcs.get(single_key)
-            color = _SCOPE_COLOR[src] if src else 0x99AAB5
-        else:
-            color = 0x99AAB5
+        src = resolved_srcs.get(single_key) if single_key else None
+        color = _SCOPE_COLOR.get(src, _NEUTRAL_COLOR) if src else _NEUTRAL_COLOR
 
         context_label = "DM" if is_dm else f"server `{guild_id}`, channel `{channel_id}`"
         embed = hikari.Embed(

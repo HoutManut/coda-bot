@@ -28,7 +28,7 @@ no bot behavior. Companion to `arcaea-domain-reference.md` (catalog) and `arcaea
 - `score = floor(10_000_000 * (pure + far/2) / note_count) + shiny_pure_count` — **FACT**,
   reproduced exactly against a captured own-credentials play (Vexaria FTR, 2026-07-17):
   pure=656 far=31 lost=47 shiny=602, note_count=734 → score 9,149,103, matching the observed
-  value. Confirms `floor` (not round) and that shiny is additive *after* flooring. See [[Scoring]].
+  value. Confirms `floor` (not round) and that shiny is additive *after* flooring. See [[scoring|Scoring]].
 - Score is **lossy** — many (pure, far, lost, shiny) combinations map to one score; it cannot
   be inverted to recover a note breakdown. Structural reason the friend path can never show
   accuracy.
@@ -54,4 +54,4 @@ both are consistent and cross-reference each other in the source text itself.
 
 ## Feeds
 
-[[Scoring]], [[d-score-zero-is-real]], [[d-hard-gauge-early-submit]], [[d-r10-impossible-friend-path]]
+[[scoring|Scoring]], [[d-score-zero-is-real]], [[d-hard-gauge-early-submit]], [[d-r10-impossible-friend-path]]

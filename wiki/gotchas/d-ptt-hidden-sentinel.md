@@ -41,7 +41,7 @@ that silently corrupts any average/sort/comparison it enters.
    two fields is a trap even though both use `-1`.
 2. Sorting a hidden player to the bottom of a leaderboard "as if" they were rated `0` — an
    *unknown* PTT is not a *low* one; the player may be far above everyone on the list.
-3. Substituting our own computed PTT (see [[Potential]] §Traps) into a passive surface just
+3. Substituting our own computed PTT (see [[potential|Potential]] §Traps) into a passive surface just
    because the server's `rating` is `-1` — hiding is a render-boundary rule that must suppress
    **every recoverable form** of the value (a b30 average, a per-play rating listing, a
    rating-sorted position), not just the literal `rating` field. Showing our own number "since
@@ -55,7 +55,7 @@ that silently corrupts any average/sort/comparison it enters.
 - Suppress on **passive** surfaces (leaderboard, auto-posted embed, profile card); show on
   **self-invoked** rating commands only (`/b30` and friends) — invocation is consent, and rating
   commands are self-only by design so the check is structural, not a per-surface hidden-player
-  carve-out. See [[Potential]] §Traps.
+  carve-out. See [[potential|Potential]] §Traps.
 - Keep ingesting and computing PTT/pools for hidden players unchanged — the hide is a display
   rule only, applied at render time, never at ingest.
 - Name the two `rating` fields distinctly in code/DTOs (e.g. `chart_constant` vs. `ptt`) rather

@@ -112,27 +112,9 @@ _session: aiohttp.ClientSession | None = None
 def encode_multipart(fields: dict[str, str]) -> tuple[bytes, str]:
     """Build a multipart/form-data body by hand. Returns ``(body, content_type)``.
 
-    **Do not replace this with `aiohttp.FormData`.** Verified against the live API
-    2026-07-17: `FormData` makes `POST /webapi/friend/me/add` hang until Cloudflare
-    returns a **504**, while this byte-identical hand-built body gets a normal
-    `404 {"success": false, "error_code": 401}` on the same session, seconds apart.
-
-    The cause is the framing, not the fields: `FormData` is a streaming payload, so
-    aiohttp sends `Transfer-Encoding: chunked` with no `Content-Length`, and lowiro's
-    origin waits for a body it never decides has ended. A `bytes` payload gets a
-    `Content-Length` and is read immediately. This makes the old client's hand-rolled
-    `WebKitFormBoundary` **load-bearing, not cargo-cult** -- unlike its hardcoded
-    `Content-Length: 41`, which really was junk and stays deleted (aiohttp computes it).
-
-    The boundary mimics Chrome's, consistent with the header spoofing: free to do,
-    and one less way to look like a script.
-
+    Do not replace with `aiohttp.FormData` -- see wiki/gotchas/w-formdata-504.md.
     Values are validated, not escaped: a name or value containing CRLF or the
-    boundary token would break the framing, so it raises ``ArcaeaError`` before
-    assembling anything (real multipart value escaping is under-specified -- a
-    hard reject is the honest choice). Fine today -- every call site sends
-    validated 9-digit codes or ``str(int)`` -- but this makes routing free text
-    through here fail loud instead of silently corrupting the request.
+    boundary token raises ``ArcaeaError`` rather than corrupting the framing.
     """
     boundary = f"----WebKitFormBoundary{uuid.uuid4().hex[:16]}"
     for name, value in fields.items():
@@ -331,21 +313,14 @@ async def request(
 ) -> Any:
     """Perform one rate-limited request and return the decoded JSON body.
 
-    ``form`` is a plain dict of fields; it is encoded by :func:`encode_multipart`,
-    which must not be swapped for ``aiohttp.FormData`` -- see its docstring.
-
+    ``form`` is encoded by :func:`encode_multipart`, never ``aiohttp.FormData``.
     Does not interpret the body -- callers pass it to
-    :func:`errors.raise_for_envelope`. Raises :class:`UnexpectedResponse` if the
-    response is not JSON at all (an HTML error page or a WAF block), and
-    :class:`TransportError` if no response arrived at all (DNS, TCP, TLS,
-    timeout) -- so the full failure surface is typed ``ArcaeaError``.
+    :func:`errors.raise_for_envelope`. Raises :class:`UnexpectedResponse` for a
+    non-JSON response and :class:`TransportError` for no response at all, so the
+    full failure surface is typed ``ArcaeaError``.
 
-    The sid is sent as an explicit Cookie header, never via a cookie jar: the
-    session uses a ``DummyCookieJar`` (see :func:`_get_session`) precisely so the
-    jar cannot inject a stale sid. The cookie is ``Domain=lowiro.com``, which a
-    default jar would parent-match onto every ``webapi.lowiro.com`` request and
-    merge over the explicit header -- leaking one account's sid onto another's
-    call. The explicit header is the single source of truth.
+    The sid is sent as an explicit Cookie header, never via a cookie jar -- see
+    wiki/modules/arcaea.md on ``DummyCookieJar``.
     """
     headers = _headers()
     if sid is not None:

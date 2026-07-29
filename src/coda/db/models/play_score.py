@@ -1,23 +1,9 @@
 """PlayScore -- one observed play, accumulated by the poller.
 
-The wire only ever exposes the *latest* play per account (``recent_score``,
-one entry). A play not captured while it sits there is gone forever -- there is
-no backfillable history endpoint (``arcaea-api-layer.md`` §7). So these rows are
-the only play history that will ever exist, and everything downstream (``/recent``,
-the live-update feed, PBs, b30) reads them.
-
-Identity is the WIRE tuple, never the resolved chart FK. The resolved
-``song_difficulty_id`` is derived and backfillable -- resolution can fail for a
-song not yet seeded, or move (``byd_2`` resolves to a class the wire never sent,
-``arcaea-score-mapping.md`` §3). Keying identity on the immutable wire fields
-means an unresolved play is stored, deduped, and re-resolved later without
-identity churn. See the dedup notes on ``PlayScore.__table_args__``.
-
-Detail columns (pure/far/lost, health, clear_type, modifier, ``wire_play_id``)
-are the own-credentials path only -- the friend endpoint never returns them for
-anyone, a property of the endpoint, not the user. They stay NULL on friend-tier
-rows. Play rating is NOT stored: recompute from ``score`` + catalog CC at read
-time, since CC refines over time (same rule as "tier is derived, never stored").
+The wire exposes only the latest play per account, so these rows are the only
+play history that will ever exist. Identity is the wire tuple, never the
+resolved chart FK, so an unresolved play is stored and re-resolved later
+without identity churn. See wiki/modules/scores.md.
 """
 
 from __future__ import annotations

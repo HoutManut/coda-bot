@@ -3,5 +3,7 @@
     "vault-colors"
   ],
   "cssTheme": "Catppuccin",
-  "textFontFamily": "JetBrains Mono"
+  "textFontFamily": "JetBrains Mono",
+  "translucency": true,
+  "theme": "system"
 }

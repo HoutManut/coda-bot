@@ -1,5 +1,5 @@
 // Jacket widget: drop a file or paste an image URL; it uploads to
-// assets/jackets/<stem>.jpg and points the field at that stem. The stem is the
+// assets/jackets/<stem>.webp and points the field at that stem. The stem is the
 // field's current value, or the widget's data-default (song_id / song_id_DIFF).
 (function () {
   function bust(src) {
@@ -34,7 +34,7 @@
         input.value = data.stem;
         thumb.src = bust(data.src);
         thumb.style.display = "";
-        status.textContent = "Saved " + data.stem + ".jpg";
+        status.textContent = "Saved " + data.stem + ".webp";
       } catch (e) {
         status.textContent = "✕ " + e.message;
       }
@@ -78,7 +78,7 @@
 
     // Live-refresh preview when the stem is typed/changed.
     input.addEventListener("change", () => {
-      if (input.value.trim()) { thumb.src = bust("/jacket-img/" + input.value.trim() + ".jpg"); thumb.style.display = ""; }
+      if (input.value.trim()) { thumb.src = bust("/jacket-img/" + input.value.trim() + ".webp"); thumb.style.display = ""; }
     });
     thumb.addEventListener("error", () => { thumb.style.display = "none"; });
   }

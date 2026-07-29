@@ -1,11 +1,7 @@
 """Symmetric encryption for stored Arcaea credentials.
 
 Covers both our own bot accounts and player-linked accounts under one key
-(``FERNET_KEY``). There is deliberately no rotation path at this scale --
-rotating means re-encrypting every row by hand.
-
-Ciphertext is stored as ``str`` in ``String`` columns; Fernet tokens are
-urlsafe-base64, so they survive a text column unharmed.
+(``FERNET_KEY``). There is deliberately no rotation path at this scale.
 """
 
 from __future__ import annotations

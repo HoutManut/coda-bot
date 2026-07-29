@@ -36,7 +36,7 @@ _NOT_OWNER = (
 )
 _ON_BLURB = "New plays are being recorded."
 _OFF_BLURB = (
-    "New plays are **not** being recorded. Your stored plays are kept, and "
+    "New plays will **not** be recorded. Your stored plays are kept, and "
     "`/recent` still works -- it just shows what the game reports without "
     "saving it."
 )

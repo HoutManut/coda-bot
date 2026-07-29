@@ -15,6 +15,7 @@ backups/
 
 # Game assets -- lowiro-copyrighted art + legacy seed data; live data is in the DB
 assets/jackets/
+assets/chardle/
 assets/arcsongs.json
 
 # OS / editor / tool cruft
@@ -33,7 +34,7 @@ assets/arcsongs.json
 # Private research/design source docs -- archived outside this repo; wiki/ is the
 # public knowledge layer. Guard in case a copy is ever pulled back in locally.
 context/
-api_layer_findings.md
+*.original.md
 
 # Logs
 logs/

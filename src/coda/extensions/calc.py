@@ -50,6 +50,8 @@ from coda.catalog.search import (
 from coda.db.enums import DifficultyClass, Side
 from coda.db.models import Song, SongDifficulty
 from coda.db.session import async_session
+from coda.settings import ConfigService
+from coda.settings.zone import effective_zone
 from coda.utils.scoring import (
     MAX_SCORE,
     PURE_MEMORY,
@@ -445,6 +447,13 @@ class CalcCommand(
             return
 
         async with async_session() as db:
+            zone = await effective_zone(
+                db,
+                ConfigService(),
+                guild_id=int(ctx.guild_id) if ctx.guild_id is not None else None,
+                channel_id=int(ctx.channel_id),
+                user_id=int(ctx.user.id),
+            )
             rendered = await _resolve_target(
                 db,
                 svc,
@@ -452,7 +461,7 @@ class CalcCommand(
                 target,
                 difficulty=CLASS_OPTIONS.get(self.difficulty or ""),
                 locale=ctx.interaction.locale,
-                night=is_night(int(ctx.user.id)),
+                night=is_night(zone),
             )
             await _respond(ctx, rendered, ephemeral=self.ephemeral)
 
@@ -502,9 +511,17 @@ async def _on_calc_component(event: hikari.InteractionCreateEvent) -> None:
         return
 
     locale = interaction.locale
-    night = is_night(int(interaction.user.id))
     score = int(parts[2])
     async with async_session() as db:
+        night = is_night(
+            await effective_zone(
+                db,
+                ConfigService(),
+                guild_id=int(interaction.guild_id) if interaction.guild_id is not None else None,
+                channel_id=int(interaction.channel_id),
+                user_id=int(interaction.user.id),
+            )
+        )
         if parts[1] == "s":
             rendered = await _render_song(
                 db, ":".join(parts[3:]), score, locale, night

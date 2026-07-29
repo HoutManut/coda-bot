@@ -11,6 +11,7 @@ than inventing a value.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import hikari
@@ -36,6 +37,14 @@ _UNRESOLVED_NOTE = (
 )
 
 
+@dataclass(frozen=True)
+class PlayerIdentity:
+    """Who played it, for a post that has no interaction header to say so."""
+
+    name: str
+    avatar_url: str | None = None
+
+
 def score_embed(
     row: PlayScore,
     chart: SongDifficulty | None,
@@ -43,12 +52,24 @@ def score_embed(
     *,
     locale: object,
     night: bool,
+    player: PlayerIdentity | None = None,
+    live: bool = False,
+    untracked: bool = False,
 ) -> tuple[hikari.Embed, hikari.File | None]:
     """The embed for one play, plus the jacket file it references.
 
     ``chart``/``song`` are None when the play's chart is unresolved. The caller
     sends the returned file only via the embed -- passing it as an attachment
     too uploads a second copy.
+
+    ``player`` adds an author line. ``/recent`` omits it -- Discord's own
+    interaction header already attributes the reply to whoever invoked it -- but
+    a live post is bot-authored, so in a channel following several players a
+    bare embed would say nothing about whose play it is.
+
+    ``live`` marks a poster-authored update; ``untracked`` marks a play the bot
+    only observed and never stored (the account has tracking off). Both surface
+    as a word in the footer, next to the timestamp.
     """
     embed = hikari.Embed(
         title=_title(row, chart, song, locale),
@@ -58,10 +79,25 @@ def score_embed(
         # renders it in the footer, localised by Discord per viewer.
         timestamp=datetime.fromtimestamp(row.time_played / 1000, tz=UTC),
     )
+    footer = _footer(live, untracked)
+    if footer is not None:
+        embed.set_footer(footer)
+    if player is not None:
+        embed.set_author(name=player.name, icon=player.avatar_url)
     file = chart_jacket(song, chart, locale, night) if song and chart else None
     if file is not None:
         embed.set_thumbnail(file)
     return embed, file
+
+
+def _footer(live: bool, untracked: bool) -> str | None:
+    """A minimal marker beside the timestamp, or None for a plain stored play."""
+    marks: list[str] = []
+    if live:
+        marks.append("Live")
+    if untracked:
+        marks.append("Untracked")
+    return " · ".join(marks) if marks else None
 
 
 def _title(

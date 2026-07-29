@@ -1,21 +1,8 @@
 """Friend codes that are well-formed but must never be registered.
 
-Checked after the shape validation in ``coda.utils.friend_code`` and **before any
-network call** -- same reasoning as the shape check: lowiro will happily accept
-these and answer with whatever it answers, and none of its replies would tell a
-user anything useful. Deciding locally is what buys a real message.
-
-Three kinds:
-
-* **Easter eggs** -- partner codes built into the game. Not players; they have no
-  scores to track.
-* **The owner's code** -- anyone but an owner registering it is impersonation.
-* **The bot's own accounts** -- the API would let a bot friend another bot, which
-  burns a friend slot and creates a bot-watching-bot row. **This one is refused
-  with a plain "you can't use that code"** (see :func:`is_bot_account`) -- no
-  fake not-found and no mimicked latency: this repo is open source, so shrouding
-  the pool behind a lie would fool nobody while telling a real user their code
-  does not exist, which is false and unactionable.
+Checked before any network call, same as shape validation --
+see wiki/decisions/w-local-friend-code-validation.md and
+wiki/decisions/w-honest-bot-code-refusal.md.
 """
 
 from __future__ import annotations

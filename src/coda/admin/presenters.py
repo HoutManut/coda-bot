@@ -15,7 +15,6 @@ from __future__ import annotations
 import colorsys
 import random
 import hashlib
-from datetime import date, datetime, timezone
 
 from coda.db.enums import DifficultyClass, Side
 from coda.utils.encoding import (
@@ -33,14 +32,23 @@ _NA = -1
 # --- level ----------------------------------------------------------------
 
 def display_level(value: int) -> str:
-    """Stored level int -> display string ("9", "10+", "TBA", "?")."""
+    """Stored level int -> editable string ("9", "10+", "0" (TBA), "?").
+
+    ``decode_level`` renders both sentinels as ``"?"``, which would silently
+    rewrite a TBA level to unknown on save; the two are split here so the form
+    round-trips through :func:`parse_level` exactly.
+    """
+    if value == _TBA:
+        return "0"
+    if value == _NA:
+        return "?"
     return decode_level(value)
 
 
 def parse_level(text: str) -> int:
-    """Display level string -> stored int. Blank/"TBA" -> 0, "?" -> -1."""
+    """Display level string -> stored int. Blank/"TBA"/"0" -> 0, "?" -> -1."""
     text = text.strip()
-    if text == "" or text.upper() == "TBA":
+    if text == "" or text.upper() == "TBA" or text == "0":
         return _TBA
     if text == "?":
         return _NA
@@ -50,22 +58,50 @@ def parse_level(text: str) -> int:
 # --- rating (chart constant) ----------------------------------------------
 
 def display_rating(value: int) -> str:
-    """Stored rating int -> display string ("11.3", "TBA", "?")."""
+    """Stored rating int -> editable string ("11.3", "-8.8", "TBA", "?").
+
+    A delisted chart stores its historical CC negated (``rating < -1``), and the
+    sign is kept rather than hidden so the value round-trips through
+    :func:`parse_rating` unchanged. ``decode_rating`` is deliberately not used:
+    it passes non-positive values through undivided, which would render ``-88``
+    as ``-88.0`` and re-encode it as ``-880``.
+    """
     if value == _TBA:
-        return "?.?"
+        return "0"
     if value == _NA:
-        return "?.?"
-    return f"{decode_rating(value):.1f}"
+        return "?"
+    return f"{value / 10:.1f}"
 
 
 def parse_rating(text: str) -> int:
-    """Display rating string -> stored int. Blank/"0" -> 0, "?" -> -1."""
+    """Display rating string -> stored int. Blank/"0"/"TBA" -> 0, "?" -> -1."""
     text = text.strip()
-    if text == "" or text == "0":
+    if text == "" or text == "0" or text.upper() == "TBA":
         return _TBA
     if text == "?":
         return _NA
     return encode_rating(float(text))
+
+
+# --- list rendering -------------------------------------------------------
+#
+# The list collapses every non-positive level/CC to one "?" — a table is for
+# scanning, and three different unknowns are noise there. The detail form keeps
+# the exact value so a save round-trips (see :func:`display_rating`).
+
+def list_level(value: int) -> str:
+    """Stored level -> list cell. Any non-positive value renders "?"."""
+    return "?" if value <= 0 else decode_level(value)
+
+
+def list_rating(value: int) -> str:
+    """Stored rating -> list cell. Any non-positive value renders "?"."""
+    return "?" if value <= 0 else f"{decode_rating(value):.1f}"
+
+
+def is_sentinel(value: int) -> bool:
+    """Whether a level/rating renders as "?" rather than a real value."""
+    return value <= 0
 
 
 # --- side -----------------------------------------------------------------
@@ -130,35 +166,6 @@ def parse_time(text: str) -> int:
         minutes, _, secs = text.partition(":")
         return int(minutes or 0) * 60 + int(secs or 0)
     return int(text)
-
-
-# --- dates ----------------------------------------------------------------
-#
-# ``songs.date`` is a unix timestamp in **seconds**. A date picker only carries
-# day precision, so editing a date snaps it to that day's midnight UTC — fine
-# for manual admin edits. ``packs.release_date`` is treated the same way.
-
-def display_date(seconds: int | None) -> str:
-    """Unix-seconds -> ``YYYY-MM-DD`` for a date input (empty string for None)."""
-    if seconds is None:
-        return ""
-    return datetime.fromtimestamp(seconds, tz=timezone.utc).date().isoformat()
-
-
-def parse_date(text: str) -> int | None:
-    """Unix-seconds or ``YYYY-MM-DD`` -> unix-seconds (None for blank).
-
-    The song forms post a raw seconds value directly; a bare ISO date is still
-    accepted (pasted, or from the pack date picker) and snapped to that day's
-    midnight UTC."""
-    text = text.strip()
-    if not text:
-        return None
-    if text.lstrip("-").isdigit():
-        return int(text)
-    d = date.fromisoformat(text[:10])
-    dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
-    return int(dt.timestamp())
 
 
 # --- tag category colors --------------------------------------------------

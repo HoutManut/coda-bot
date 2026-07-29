@@ -1,11 +1,12 @@
 ---
 type: question
-status: open
+status: answered
 blocks: []
 source: 06-credentials-changed-server-side.md
 created: 2026-07-21
-updated: 2026-07-21
-tags: [question, credentials, unresearched]
+updated: 2026-07-23
+verified: 2026-07-18
+tags: [question, credentials]
 aliases: ["Can a stored Arcaea credential go stale server-side, and if so, is the current handling adequate?"]
 ---
 
@@ -62,4 +63,34 @@ credential is exactly what is unresolved.
 
 ## Answer
 
-Not yet answered.
+**Already resolved before this question was filed** — captured 2026-07-18 (three days
+before this page's `created` date), documented in `src/coda/arcaea/errors.py`'s module
+docstring and [[w-third-auth-envelope]], but never cross-linked back here. No new wire
+capture needed; closing by pointing at existing evidence.
+
+- **Whose credentials**: both. `sessions/adapters.py` shares one core between
+  `BotAccountAdapter` (flips `BotAccount.is_active`) and `PlayerCredentialAdapter` (flips
+  `PlayerCredential.is_valid`) — same `InvalidCredentials`/`mark_dead` mechanism, same
+  wire behavior, regardless of which credential type rotated.
+- **Changed by whom, why**: mechanically irrelevant — the wire treats an
+  owner-rotated password and a lowiro-forced reset identically. Only the *symptom* is
+  observed, not the cause.
+- **How it surfaces on the wire**: NOT a direct 403 as guessed. It's two steps —
+  the next authenticated call gets **HTTP 401 `{"code":"UnauthorizedError"}`**
+  (a third envelope, distinct from `error_code: 203`), which `raise_for_envelope`
+  maps to `SessionExpired` (transient, re-login attempted once). *That* re-login is
+  what discovers the password no longer works — `/auth/login` then returns the
+  ordinary 403 `ForbiddenError`, raising `InvalidCredentials` (terminal, `mark_dead`).
+  A rotated password becomes a terminal failure only after one failed reauth attempt,
+  never immediately.
+- **Is existing handling adequate**: yes. The design already does the thing the "what
+  would answer it" section wondered about — attempts a re-auth before declaring
+  terminal, rather than terminal-on-first-401. `is_valid=False`/`is_active=False` is the
+  correct policy for the *outcome* of that failed reauth, not a shortcut around it.
+- **Notification**: ships — `players/session.py::handle_invalid` →
+  `players/notify.py::notify_credential_invalid` DMs the owner once, after the credential
+  is already durably marked dead. Nothing further needed here.
+
+No design change indicated. The only actual gap was cross-referencing — this page existed
+because its author didn't know about the 2026-07-18 capture; [[w-third-auth-envelope]] and
+`errors.py` are the authoritative record going forward.

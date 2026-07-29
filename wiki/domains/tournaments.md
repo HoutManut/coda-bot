@@ -22,8 +22,7 @@ A tournament round is a **chart + a time window**, scored by reading rows the
 poller already wrote for an unrelated reason. **The tournament layer never
 calls the lowiro API.** It does exactly two things:
 
-1. **Declares hot windows** — tells the poller which accounts to poll faster,
-   because a round is open.
+1. **Declares hot windows** — tells the poller which accounts to poll faster, because a round is open.
 2. **Reads `play_scores`**, filtered by chart and time range.
 
 The poller already fetches `/webapi/friend/me` for every friend on a bot
@@ -31,7 +30,7 @@ account — participants and non-participants alike, since the endpoint has no
 way to request a subset. A round's scores are already arriving in the ingest
 stream; a tournament-specific fetch would be a second request for bytes
 already received. This makes the module testable by inserting score rows —
-no HTTP, no session/`bot_account_id` awareness anywhere in it. See [[Score Poll Loop]].
+no HTTP, no session/`bot_account_id` awareness anywhere in it. See [[score-poll-loop|Score Poll Loop]].
 
 ## Encoding
 
@@ -43,16 +42,12 @@ valid(score, round) =
   and round.start <= score.time_played <= round.end
 ```
 
-Must compare `difficulty_id`, not `song_id` — the same song at PST vs FTR is a
-different, trivially easier chart, and the wire gives `(song_id, difficulty)`
-where both fields must match.
+Must compare `difficulty_id`, not `song_id` — the same song at PST vs FTR is a different, trivially easier chart, and the wire gives `(song_id, difficulty)` where both fields must match.
 
 `time_played` is **server-assigned**, UTC milliseconds, at submission — a
 moved device clock cannot forge window membership (graded, verified
 2026-07-17 against [[arcaea-auth-behavior]] §7.3). This is what makes
-"played inside the window" a real guarantee, not an honour system. The only
-remaining skew is the bot's clock vs lowiro's server clock — both presumably
-NTP-synced; see [[h-tournament-clock-skew]].
+"played inside the window" a real guarantee, not an honour system. The only remaining skew is the bot's clock vs lowiro's server clock — both presumably NTP-synced; see [[h-tournament-clock-skew]].
 
 **Two windows, not one:**
 
@@ -67,6 +62,8 @@ Polling is discrete, so a play at `end - 1s` may not be *seen* until after
 
 ### The window duration
 
+Notice: unknown time should make duration window longer not shorter. bring this up whenever this discussion comes again.
+
 `duration = clamp(2t, 100s, 5m)`, where `t` = song length from
 `songs.time`/`song_difficulties.time` (catalog inheritance rule — see
 [[db]]). `t = 0` is an unknown sentinel and floors to 100s regardless.
@@ -78,7 +75,7 @@ Polling is discrete, so a play at `end - 1s` may not be *seen* until after
 | `200` | 300s (ceiling bites) |
 
 Polling starts at window **open**, not `start + t` — a hard-gauge loss submits
-its score seconds in ([[Scoring]] §5), so a valid score can land almost
+its score seconds in ([[scoring|Scoring]] §5), so a valid score can land almost
 immediately.
 
 `2t` is **not** two attempts — real attempt cost is `t + overhead` (song
@@ -107,7 +104,7 @@ writeup.
 | Hard-gauge loss | **locks in** ⚠️ | recoverable — just retry |
 
 ⚠️ **Under `first`, hard gauge is a trap and the player's own choice.** A
-hard-gauge loss submits its score seconds in ([[Scoring]] §5); under `first`
+hard-gauge loss submits its score seconds in ([[scoring|Scoring]] §5); under `first`
 that death is the player's first valid score inside the window, so it counts
 and locks in. Normal and easy gauge cannot do this — HP hitting 0 costs
 nothing on those gauges, so the play always runs to completion. **Under
@@ -188,7 +185,7 @@ signup. On tier 1 a hard-gauge death is indistinguishable from a low score —
 | Credential-only participants (no friend link) | In nobody's `/friend/me` → own request per cycle. Ensure a friend link exists at signup for score rounds (a one-time placement, not a move) |
 | Non-participants in the payload | `/friend/me` returns everyone on the account — filter for the round but **still ingest the rest** |
 | Concurrent rounds sharing a chart | One play can satisfy two rounds. Harmless, but decide it rather than discover it |
-| `byd_2` | Free — resolution happens in ingest before the tournament layer sees a row; comparing resolved chart IDs just works. See [[Score Mapping]] and [[d-byd2-game-song-id-resolution|the `game_song_id` trap]] |
+| `byd_2` | Free — resolution happens in ingest before the tournament layer sees a row; comparing resolved chart IDs just works. See [[score-mapping\|Score Mapping]] and [[d-byd2-game-song-id-resolution|the `game_song_id` trap]] |
 | Participant never plays | Resolves to "no score" at deadline; never blocks the state machine |
 
 **Song ownership is explicitly OUT OF SCOPE.** `pack_id` and `Song.world_unlock`
@@ -207,6 +204,6 @@ genuinely open item is `time_played` trust, and that is resolved (§2 above —
 verified against `arcaea-auth-behavior.md` §7.3, so it is not actually open,
 just worth restating as the whole integrity model).
 
-Depends on [[Score Poll Loop]] (built, Tier 2) for its one integration point
+Depends on [[score-poll-loop|Score Poll Loop]] (built, Tier 2) for its one integration point
 (the hot-cadence query) and on the [[db]] `play_scores` table (built) for its
 only data source.

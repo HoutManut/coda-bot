@@ -2,9 +2,10 @@
 type: domain
 status: active
 source: arcaea-potential.md
-verified: 2026-07-21
+verified: 2026-07-29
+grade: A
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-23
 tags: [domain, arcaea, potential, ptt]
 ---
 
@@ -40,7 +41,7 @@ result floored at 0 (never negative)
 | 10,000,000   | cc + 2.0    |
 
 Verified against the old project's `coda/utils/utils.py`; current as of 2026-07-17. A chart with
-an unknown CC (`rating<=0` — see [[Catalog]]) has **no computable play rating** — never
+an unknown CC (`rating<=0` — see [[catalog|Catalog]]) has **no computable play rating** — never
 substitute 0, that is a different thing from "undefined". See [[d-unknown-cc-no-play-rating]].
 
 ### PTT composition
@@ -68,8 +69,44 @@ push a good entry out.
 which enter the pool like any other completed play). Both fields are own-credentials only. See
 [[d-hard-gauge-early-submit]].
 
-**UNKNOWN (unresolved, not guessed)**: replay semantics onto a chart already in the pool — does
-an admitted play on an already-present chart refresh its recency, and can it *lower* the entry?
+**Replay semantics onto a chart already in the pool** (owner, live-tested 2026-07-23 via
+`score/rating/me` before/after diffs — see method below): a **new chart** (not currently
+occupying a pool slot) admits unconditionally on any completed play <9.8M, evicting the pool's
+globally-oldest slot, matching the table above (`leaveallbehind`, a track_lost/normal-gauge play
+scoring 0, entered clean and evicted `lamentrain`, dropping real PTT by 0.01 — math checks out:
+`(12.735445 - 12.5) / 40 = 0.0059 → rounds to the observed 0.01`). An **already-pooled chart**
+replayed with a *worse* play is a **no-op** — no rating change, no `time_played` change, no
+eviction anywhere (`designant`, replayed twice at near-zero score, left its existing 12.959 entry
+byte-identical both times). Cannot yet say the entry can never lower — only that a worse replay
+on an already-pooled chart didn't, twice.
+
+Still open, not yet tested:
+1. Already-pooled chart + an **improvement** — refreshes `rating` only, or `rating` + `time_played`
+   both? (The original open question — never actually exercised; every replay tested so far was a
+   worse play.)
+2. Already-pooled chart + worse play that's still **≥9.8M** — does "discard unless improvement"
+   hold across the whole score range, or does the ≥9.8M band behave differently even when the
+   chart's already pooled?
+3. **New** chart scoring **≥9.8M** — does "only if it raises PTT" apply against the pool's weakest
+   member (no chart-local baseline exists yet), or does a new chart bypass that check the way it
+   bypassed it under 9.8M?
+4. **Hard-gauge track_lost** (`clear_type==0` AND `modifier==2`) — the *only* clear_type-based
+   exclusion this page documents, and it has never actually been exercised live, on a new or an
+   already-pooled chart. Everything tested 2026-07-23 was `modifier==0` (normal gauge).
+5. A **second independent eviction** on a different chart, to confirm FIFO-by-`time_played` holds
+   generally and `lamentrain`'s eviction wasn't a coincidence (it was both true-oldest by
+   `time_played` and the only eviction observed so far).
+6. **Course-mode detection** — spun out to [[h-course-mode-ptt-detection]]. Course plays are
+   documented (owner) not to count toward PTT at all, but no captured wire payload so far shows a
+   distinguishing field, and it's a separate axis from the new-chart/already-pooled admission
+   question above rather than an edge of it.
+
+**Method**: `GET /webapi/score/rating/me` (tier-3/subscribed only, see
+[[handoff-10-score-history-backfill-research]]) returns `recent_rated_scores` (10 entries) drawn
+from the full 30-slot pool — snapshot before a play, play deliberately, snapshot after, diff. The
+visible 10 is a *view* over the 30, so an eviction from the 30 can promote a previously-invisible
+11th-ranked entry into view (`aishite`, rating 12.5, surfaced this way after `lamentrain` left) —
+don't mistake a promoted-into-view entry for a newly-admitted one.
 
 ### PTT wire encoding
 
@@ -88,7 +125,7 @@ Owner-verified 2026-07-17: a hidden player's PTT sends `-1` on **both** the frie
 account's own `/webapi/user/me`; the game shows `"--"`. `-1` is a sentinel, never let it reach
 arithmetic — a naive ×100 decode renders `-0.01`. See [[d-ptt-hidden-sentinel]].
 
-**Different scale from CC**, which is stored ×10 (see [[Catalog]]). PTT ×100, CC ×10 — an easy
+**Different scale from CC**, which is stored ×10 (see [[catalog|Catalog]]). PTT ×100, CC ×10 — an easy
 bug, and the two fields are both named `rating` on their respective objects (`friend.rating` for
 PTT vs. `song_difficulties.rating` for CC). See [[d-ptt-hidden-sentinel]].
 
@@ -115,8 +152,16 @@ PTT vs. `song_difficulties.rating` for CC). See [[d-ptt-hidden-sentinel]].
   out the PTT), not just the literal `rating` field. Individual scores are always fine to show.
 - **CC precision is not the limiter for higher-precision PTT display** — catalog CCs are exact
   facts at their stored ×10 granularity, not community estimates (owner, 2026-07-21). See
-  [[Catalog]] §Encoding note. Any earlier "CC precision" hedge is stale; this page states the
+  [[catalog|Catalog]] §Encoding note. Any earlier "CC precision" hedge is stale; this page states the
   corrected position directly rather than repeating a hedge that no longer applies.
+
+## Implementation status
+
+b30's read side is **built** (2026-07-23): `B30Service.compute` in
+[[scores]] (`src/coda/scores/b30.py`) computes it on demand, uncached, from
+`play_scores` — see [[h-b30-cache-stores-sum]] for the backend-shape
+decision and [[handoff-09-b30]] for the original algorithm design. No `/b30`
+command or embed yet. r10/PTT (this whole page otherwise) remain unbuilt.
 
 ## Source
 

@@ -43,8 +43,9 @@ async def test_resolve_refuses_an_already_answered_request(db):
     # Second answer must not flip an already-approved row.
     again = await SVC.resolve(db, request.id, approved=False)
     assert again is None
-    assert await SVC.get(db, request.id) is not None
-    assert (await SVC.get(db, request.id)).status is RequestStatus.APPROVED
+    row = await SVC.get(db, request.id)
+    assert row is not None
+    assert row.status is RequestStatus.APPROVED
 
 
 async def test_resolve_refuses_and_expires_a_lapsed_request(db):
@@ -52,7 +53,9 @@ async def test_resolve_refuses_and_expires_a_lapsed_request(db):
     resolved = await SVC.resolve(db, request.id, approved=True)
     assert resolved is None
     # The lapsed row is flipped to expired so a stale click settles it.
-    assert (await SVC.get(db, request.id)).status is RequestStatus.EXPIRED
+    row = await SVC.get(db, request.id)
+    assert row is not None
+    assert row.status is RequestStatus.EXPIRED
 
 
 async def test_due_expired_finds_lapsed_pending_rows(db):

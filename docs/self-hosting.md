@@ -3,6 +3,9 @@
 Everything you need to run your own instance. The [README](../README.md) covers
 what the bot does; this covers how to stand it up and operate it.
 
+> [!warning]
+> By hosting this bot, you agree to accepting the risk of breaking Arcaea ToS. See [README.md](../README.md) for more detail.
+
 ## Requirements
 
 - Python 3.14, managed with [`uv`](https://docs.astral.sh/uv/)
@@ -27,6 +30,7 @@ DATABASE_URL=postgresql+asyncpg://<user>:<pass>@127.0.0.1:5432/coda   # required
 FERNET_KEY=<44-char urlsafe base64 key>                               # required
 DEV_GUILD_IDS=<comma/space-separated guild ids, or empty for global>  # optional
 OWNER_IDS=<comma/space-separated discord user ids>                    # optional; FIRST is the main owner
+OWNER_GUILD_IDS=<guild ids /run is created in>                        # optional; falls back to DEV_GUILD_IDS
 OWNER_FRIEND_CODE=<the owner's own 9-digit friend code>               # optional; reserves the code for OWNER_IDS
 ```
 
@@ -43,8 +47,11 @@ It encrypts stored Arcaea credentials (bot accounts and linked player accounts) 
 **no rotation path** — changing it orphans every encrypted row, meaning every bot account
 must be re-seeded and every user must re-link.
 
-`OWNER_IDS` grants `/config global` and lets an owner register the otherwise-reserved friend
-code. Leaving it empty silently denies both.
+`OWNER_IDS` grants the `/run` owner terminal and lets an owner register the otherwise-reserved
+friend code. Leaving it empty silently denies both.
+
+`/run` is created only in `OWNER_GUILD_IDS` and hidden from non-admins there; with neither it
+nor `DEV_GUILD_IDS` set, it is created nowhere and owner operations are unreachable.
 
 ## Database
 
@@ -66,14 +73,37 @@ uv run alembic history                               # list migrations
 
 Imports `assets/arcsongs.json` into the ORM. Idempotent — safe to re-run.
 
-> **`assets/` is not in the repo** — jackets are lowiro-copyrighted art and
-> `arcsongs.json` is legacy seed data (the live catalog lives in the DB), so both
-> are gitignored. A fresh clone seeds from your own songs JSON (pass its path) or
-> restores a catalog dump from `backups/` via `./scripts/dump-songs.sh` output.
+> **Most of `assets/` is not in the repo** — `assets/jackets/` and
+> `assets/chardle/` are lowiro-copyrighted art and `arcsongs.json` is legacy seed
+> data (the live catalog lives in the DB), so all three are gitignored. A fresh
+> clone seeds from your own songs JSON (pass its path) or restores a catalog dump
+> from `backups/` via `./scripts/dump-songs.sh` output. `assets/fonts/` **is**
+> committed — the board renderer will not start without it.
 
 ```bash
 uv run python -m coda.catalog.seed                   # default source: assets/arcsongs.json
 uv run python -m coda.catalog.seed path/to/songs.json
+```
+
+## Chardle board art
+
+Chardle draws its boards with Pillow, from PNGs under `assets/chardle/`:
+
+```
+header.png stand.png            column header plate and its label ornament
+0.png 1.png 2.png 3.png         row plate per side; 3 (Lephon) copies 2 (Colorless)
+0_BYD.png … 3_BYD.png           Beyond variants; 2_BYD/3_BYD copy the plain plate
+back/0.png … back/3.png         jacket frame
+shadow_0.png … shadow_3.png     side pill drawn under the side name
+hint/{green,yellow,red}.png     feedback wash
+hint/{yellow,red}_{up,down}.png feedback wash with a direction chevron
+```
+
+Fonts ship in `assets/fonts/` and are routed by glyph coverage, not by language.
+After changing the chain or importing songs with new scripts:
+
+```bash
+uv run python scripts/check_font_coverage.py         # must report nothing uncovered
 ```
 
 ## Seed a bot account

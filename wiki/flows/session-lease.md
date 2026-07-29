@@ -5,6 +5,8 @@ entrypoint: "AccountSession.call(fn, *args) -- src/coda/sessions/session.py"
 touches: [sessions, arcaea, db]
 created: 2026-07-21
 updated: 2026-07-21
+verified: 2026-07-29
+grade: A
 tags: [flow, sessions, arcaea]
 aliases: ["Session Lease"]
 ---
@@ -71,6 +73,6 @@ is no separate auth-probe step anywhere in this path — the first real call *is
 
 ## Related
 
-`[[sessions]]`, `[[arcaea]]`, `[[Registration]]`,
-`[[w-third-auth-envelope]]`, `[[w-coherent-browser-identity]]`,
-`[[w-sid-confined-to-sessions]]`
+[[sessions]], [[arcaea]], [[registration|Registration]],
+[[w-third-auth-envelope]], [[w-coherent-browser-identity]],
+[[w-sid-confined-to-sessions]]

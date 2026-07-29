@@ -27,7 +27,7 @@ CLASS_SHORT: dict[DifficultyClass, str] = {
     DifficultyClass.PRS: "PRS",
     DifficultyClass.FTR: "FTR",
     DifficultyClass.BYD: "BYD",
-    DifficultyClass.BYD_2: "BYD 2",
+    DifficultyClass.BYD_2: "BYD",
     DifficultyClass.ETR: "ETR",
 }
 
@@ -36,9 +36,9 @@ CLASS_ORDER: tuple[DifficultyClass, ...] = (
     DifficultyClass.PST,
     DifficultyClass.PRS,
     DifficultyClass.FTR,
+    DifficultyClass.ETR,
     DifficultyClass.BYD,
     DifficultyClass.BYD_2,
-    DifficultyClass.ETR,
 )
 
 # Slash-command option value -> class. ``byd_2`` and ``err`` are not offered.
@@ -46,8 +46,8 @@ CLASS_OPTIONS: dict[str, DifficultyClass] = {
     "pst": DifficultyClass.PST,
     "prs": DifficultyClass.PRS,
     "ftr": DifficultyClass.FTR,
-    "byd": DifficultyClass.BYD,
     "etr": DifficultyClass.ETR,
+    "byd": DifficultyClass.BYD,
 }
 
 

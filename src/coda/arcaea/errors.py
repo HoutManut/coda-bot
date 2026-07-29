@@ -1,30 +1,9 @@
 """Typed exceptions, and the one place a lowiro response envelope is read.
 
-**There are three unrelated error envelopes, and the body is the truth:**
-
-    /webapi/*    ->  {"success": false, "error_code": N}   carried by 400 AND 404
-    /auth/login  ->  403 {"error": {"name": "ForbiddenError", "message": 104}}
-    /webapi/*    ->  401 {"code": "UnauthorizedError", "message": "Bearer token invalid"}
-
-The login envelope is read only by :func:`raise_for_login_envelope` (called from
-``auth.login``); :func:`raise_for_envelope` handles the two ``/webapi/*`` shapes.
-
-**Branch on the body, never the status.** Status and ``error_code`` are
-uncorrelated: one status spans several codes (400 carries both 203 and 602), and
-one envelope arrives under several statuses (401 arrives as 404). Assume the set
-of statuses is open -- an unseen status with a ``success: false`` body must still
-parse correctly.
-
-The third envelope (HTTP **401** ``{"code": "UnauthorizedError"}``) is a second
-"session is dead" shape alongside ``error_code: 203`` -- captured 2026-07-18 when
-a password change in another browser invalidated the stored sid. It maps to
-``SessionExpired`` (re-login once) exactly like 203; that re-login is what turns a
-*rotated* password into the terminal 403. Do NOT confuse this HTTP 401 with the
-``error_code: 401`` (PlayerNotFound) that arrives under HTTP 404 -- different
-axis entirely.
-
-The old client re-logged in on HTTP 400, which is wrong twice over: a duplicate
-add is also 400, and a nonexistent friend code is 404 with the same envelope.
+Three unrelated error envelopes exist; branch on the body, never the status --
+see wiki/gotchas/w-status-vs-body.md and wiki/gotchas/w-third-auth-envelope.md.
+:func:`raise_for_login_envelope` reads the login envelope, :func:`raise_for_envelope`
+the other two.
 """
 
 from __future__ import annotations

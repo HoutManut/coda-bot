@@ -1,10 +1,11 @@
 ---
 type: question
-status: open
+status: answered
 blocks: ["[[Score history backfill]]"]
 source: 10-score-history-backfill-research.md
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-23
+verified: 2026-07-23
 tags: [question, backfill, scale, product]
 aliases: ["Does the project have enough subscribed (tier-3) users to justify building backfill at all?"]
 ---
@@ -38,4 +39,19 @@ not established.
 
 ## Answer
 
-Not yet answered.
+**Owner-stated, 2026-07-23**: ~3 subscribed players beyond the owner — roughly 4 tier-3
+users total out of the <50-user scale ceiling. Not "one, the owner", but still small.
+
+That headcount alone doesn't settle it, though — this question was framed against the
+source doc's ~250-request-per-player design (walking `score/song/me/all`), and that's
+no longer the only option. [[handoff-10-score-history-backfill-research]] now has a
+wire-verified cheaper path: `GET /webapi/score/rating/me` returns server-precomputed
+b30+r10 in **one request**. Against a 1-request-per-player cost, a headcount of 4 easily
+clears the bar — the original "hobby feature, deprioritize" framing was calibrated for
+the heavy design, not the cheap one.
+
+**Verdict: worth building, scoped to the `rating/me` path.** A one-shot backfill (run
+once per newly-subscribed player at registration or on-demand, not a recurring job) is
+low-risk, low-cost even at this scale. The heavier `song/me/all` walk (full log/note
+detail, CC-re-evaluation survival) stays research-only/deferred — its extra cost isn't
+justified by 4 users when `rating/me` already covers the b30 seeding use case.

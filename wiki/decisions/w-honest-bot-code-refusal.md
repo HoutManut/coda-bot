@@ -65,4 +65,4 @@ exchange for a security property the wire's own shape already provides for free.
 
 `src/coda/players/reserved.py::is_bot_account` / `is_bot_email` (the checks) and their call
 sites in `src/coda/players/service.py::register_by_code` / `register_by_credentials` (the
-refusal). See [[Registration]] for where in the ordering this check runs.
+refusal). See [[registration|Registration]] for where in the ordering this check runs.

@@ -156,19 +156,55 @@
   }
 
   // --- artist/charter link picker: parse "(id)" tail, auto-link -----------
+  // Mirrors catalog/entity_id.clean_entity_id: strip only URL-breaking chars,
+  // collapse whitespace. Case, spaces, punctuation and non-ASCII all survive.
+  function cleanEntityId(name) {
+    return name.replace(/[\/?#%&]/g, "").replace(/\s+/g, " ").trim();
+  }
+
   function wireLinkPicker(form) {
     const pick = $("[data-linkpick]", form);
     const hid = $("[data-linkid]", form);
     if (!pick || !hid) return;
+    const list = pick.getAttribute("list");
+    const options = list
+      ? $$(`#${list} option`).map((o) => o.value.toLowerCase())
+      : [];
+    const create = form.parentElement &&
+      $("[data-createform]", form.parentElement);
     const idOf = (v) => { const m = v.match(/\(([^)]+)\)\s*$/); return m ? m[1] : ""; };
+
+    // The create affordance appears only once what is typed matches no option.
+    function refreshCreate() {
+      if (!create) return;
+      const typed = pick.value.trim();
+      const known = !typed ||
+        options.some((o) => o.includes(typed.toLowerCase()));
+      create.hidden = known;
+      if (!known) {
+        $("[data-createname]", create).value = typed;
+        $("[data-createid]", create).value = cleanEntityId(typed);
+      }
+    }
+
     pick.addEventListener("input", () => {
       const id = idOf(pick.value);
-      if (id) { hid.value = id; form.requestSubmit ? form.requestSubmit() : form.submit(); }
+      if (id) { hid.value = id; form.requestSubmit ? form.requestSubmit() : form.submit(); return; }
+      refreshCreate();
     });
     form.addEventListener("submit", (e) => {
       const id = idOf(pick.value) || pick.value.trim();
       if (!id) { e.preventDefault(); return; }
       hid.value = id;
+    });
+
+    if (!create) return;
+    create.action = form.dataset.createbase;
+    $("[data-createname]", create).addEventListener("input", (e) => {
+      $("[data-createid]", create).value = cleanEntityId(e.target.value);
+    });
+    $("[data-createcancel]", create).addEventListener("click", () => {
+      create.hidden = true; pick.value = ""; pick.focus();
     });
   }
 
@@ -692,6 +728,27 @@
     $$("[data-tagform]", scope).forEach(wireTagPicker);
     $$("[data-secdate]", scope).forEach(wireSecDate);
     $$("[data-dirty-track]", scope).forEach(wireDirtyTracker);
+    $$("[data-unfilter]", scope).forEach(wireUnfilter);
+  }
+
+  // --- filter chips -------------------------------------------------------
+  // A chip's ✕ unsets the control it names and re-requests. Clearing through
+  // the form (not the URL) keeps one source of truth for filter state.
+  function wireUnfilter(btn) {
+    btn.addEventListener("click", () => {
+      const form = document.getElementById("controls");
+      if (!form) return;
+      const name = btn.dataset.unfilter;
+      const value = btn.dataset.value;
+      $$(`[name="${name}"]`, form).forEach((el) => {
+        if (el.type === "checkbox") {
+          if (el.value === value) el.checked = false;
+        } else {
+          el.value = "";
+        }
+      });
+      form.dispatchEvent(new Event("change", { bubbles: true }));
+    });
   }
 
   // After a save we redirect to #chart-<id>; open that chart and scroll to it so

@@ -74,5 +74,5 @@ wire (`reserved.py`), the durable owner-approval flow for a contested code claim
 
 ## Related
 
-`[[Registration]]`, `[[sessions]]`, `[[arcaea]]`,
-`[[w-friend-code-strip]]`, `[[w-local-friend-code-validation]]`
+[[registration|Registration]], [[sessions]], [[arcaea]],
+[[w-friend-code-strip]], [[w-local-friend-code-validation]]

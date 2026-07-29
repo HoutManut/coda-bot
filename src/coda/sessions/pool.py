@@ -19,12 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class NoCapacity(Exception):
-    """Every active bot account is full.
-
-    Genuinely terminal at this scale: it means a human must create another bot
-    account (manual by design -- automating signup would mean defeating email
-    verification and CAPTCHA, risking a ban on the accounts the bot depends on).
-    """
+    """Every active bot account is full. Terminal."""
 
 
 class SessionPool:
@@ -103,7 +98,7 @@ class SessionPool:
                 max_friends,
             )
             return session, known
-
+        logger.warning("every active bot account is at its friend cap", extra={"discord": True, "ping": True})
         raise NoCapacity("every active bot account is at its friend cap")
 
     async def release(self, account: ArcaeaAccount) -> None:
@@ -114,13 +109,7 @@ class SessionPool:
         capacity counts friends, so the slot is not truly free until lowiro no
         longer holds the friend.
 
-        Unfriend FIRST, NULL second. Reversing frees the slot in our accounting
-        while lowiro still holds the friend -- the exact drift the 602 /
-        AlreadyFriend recovery exists to clean up. If the unfriend fails: log,
-        leave ``bot_account_id`` SET, and let reconcile repair it -- never raise,
-        a stray must not fail on a flaky unfriend. ``remove_friend`` takes the
-        ``arc_user_id``, not the friend code (endpoints.py). No-op if nobody
-        holds them.
+        Unfriend FIRST, NULL second.
         """
         bot_account_id = account.bot_account_id
         if bot_account_id is None:

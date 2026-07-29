@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import diff_chip %}
 {% block title %}{{ tag.label }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -47,7 +48,7 @@
   <ul class="links">
     {% for ch in charts %}
     <li><a href="/songs/{{ ch.song_id }}#chart-{{ ch.id }}">{{ ch.name }}</a>
-      <span class="diff-chip diff-{{ ch.difficulty.value }}">{{ ch.difficulty.value | upper }}</span>
+      {{ diff_chip(ch.difficulty) }}
       <code>{{ ch.song_id }}</code></li>
     {% else %}<li class="muted">No charts.</li>{% endfor %}
   </ul>

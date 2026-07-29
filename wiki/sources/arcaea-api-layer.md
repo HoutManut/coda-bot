@@ -81,12 +81,12 @@ poster and tournaments.
   friend parsing, multipart value validation, and the last-slot placement retry. None of
   these appear in `arcaea-api-layer.md` itself. Treat `arcaea-api-layer.md` as the
   **design**, and shipped code as the **current state** — see the
-  contradiction note in [[arcaea (module)]] and [[sessions (module)]].
+  contradiction note in [[arcaea|arcaea (module)]] and [[sessions|sessions (module)]].
 - Does not restate `arcaea-auth-behavior.md`'s findings and explicitly defers to it on any
   disagreement (see this doc's own preamble).
 
 ## Feeds
 
-[[arcaea (module)]], [[sessions (module)]], [[Registration]], [[Session Lease]],
+[[arcaea|arcaea (module)]], [[sessions|sessions (module)]], [[registration|Registration]], [[session-lease|Session Lease]],
 [[w-third-auth-envelope]], [[w-formdata-504]], [[w-friend-code-strip]],
 [[w-honest-bot-code-refusal]]

@@ -2,7 +2,8 @@
 type: domain
 status: active
 source: arcaea-auth-behavior.md
-verified: 2026-07-17
+verified: 2026-07-29
+grade: B
 created: 2026-07-21
 updated: 2026-07-21
 tags: [domain, arcaea, wire, auth, sessions]
@@ -97,7 +98,7 @@ is the one genuine status-based exception.
   mutating authed POSTs).
 - `sid` alone, with **no** spoofed browser headers at all, gets a 200. **FACT, CLOSED.**
   Header spoofing (Origin/Referer/UA/`sec-ch-ua*`) is kept anyway as Cloudflare insurance —
-  see [[Decision: Coherent Per-Account Browser Identity]]. **Do not read this fact as
+  see [[w-coherent-browser-identity|Coherent Per-Account Browser Identity]]. **Do not read this fact as
   license to drop spoofing.**
 
 ## Friend-slot cap (`max_friend`)
@@ -130,7 +131,7 @@ real play investment that is not worth it for a bot account.
   captured a day later.
 - `rating: -1` (PTT hidden, not zero), `score: 0` (a real score, not null), and
   `showcase_characters` (ints **or** dicts in the same response) are DTO-boundary sentinels
-  — see [[arcaea (module)]] §sentinels for the handling.
+  — see [[arcaea|arcaea (module)]] §sentinels for the handling.
 - `add`/`delete` field asymmetry (`friend_code` vs `friend_id`) — easy to pass the wrong
   identifier since `ArcaeaAccount` stores both.
 

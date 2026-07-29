@@ -18,6 +18,7 @@ import asyncio
 import logging
 import re
 from collections import Counter
+from zoneinfo import ZoneInfo
 
 import hikari
 import lightbulb
@@ -56,6 +57,8 @@ from coda.catalog.search import (
 from coda.db.enums import DifficultyClass, Side
 from coda.db.models import Song, SongDifficulty
 from coda.db.session import async_session
+from coda.settings import ConfigService
+from coda.settings.zone import effective_zone
 from coda.utils.encoding import decode_level, encode_level
 
 logger = logging.getLogger(__name__)
@@ -71,7 +74,11 @@ _DEAD_END_TTL = 15
 # The one place the accepted grammar is stated to the user -- shared by the
 # empty-query prompt and the zero-match reply (handoff 09 §8.3).
 _SYNTAX_HELP = (
-    "Type a song name, an alias, a level like `10+`, or a CC like `10.9`."
+    "Type a song name, an alias, a level like `10+`, or a CC like `10.9`.\n"
+    "Or filter: `artist:sakuzyo`, `charter:toaster`, `pack:\"eternal core\"`, "
+    "`side:conflict`, `level>10`, `cc>=9.7`, `bpm>180`, `note<1200`, "
+    "`date>2023-06-01`, `version:6` (matches 6.x). Repeat a key to bound it "
+    "(`bpm>180 bpm<220`)."
 )
 _COLOR_INFO = 0x5865F2
 
@@ -425,14 +432,19 @@ async def _render_list(
     diff_char: str,
     page: int,
     locale: object,
+    truncated: bool = False,
 ) -> _Rendered:
     total_pages = max(1, (len(ids) + _PAGE_SIZE - 1) // _PAGE_SIZE)
     page = max(0, min(page, total_pages - 1))
     page_ids = ids[page * _PAGE_SIZE : (page + 1) * _PAGE_SIZE]
     entries = await load_charts_ordered(db, page_ids)
     embed = hikari.Embed(
-        title=f"{len(ids)} charts",
-        description="Pick one from the menu below.",
+        title=f"{len(ids)}{'+' if truncated else ''} charts",
+        description=(
+            "Showing the top matches — add a filter to narrow it down."
+            if truncated
+            else "Pick one from the menu below."
+        ),
         color=_COLOR_INFO,
     )
     rows = _list_rows(
@@ -469,7 +481,7 @@ async def _render(
             return await _render_song_dupes(db, ids, locale)
         case ChartPick(difficulty_ids=ids):
             return await _render_chart_pick(db, ids, locale)
-        case ChartList(difficulty_ids=ids):
+        case ChartList(difficulty_ids=ids, truncated=truncated):
             return await _render_list(
                 db,
                 ids,
@@ -477,6 +489,7 @@ async def _render(
                 diff_char=_DIFF_CHARS.get(difficulty, "_") if difficulty else "_",
                 page=0,
                 locale=locale,
+                truncated=truncated,
             )
         case DidYouMean():
             return await _render_did_you_mean(db, res, locale)
@@ -592,13 +605,13 @@ class SongCommand(
     async def invoke(self, ctx: lightbulb.Context, svc: SearchService) -> None:
         query = (self.q or "").strip()
         locale = ctx.interaction.locale
-        night = is_night(int(ctx.user.id))
         difficulty = CLASS_OPTIONS.get(self.difficulty) if self.difficulty else None
 
         # No defer: /song makes no external calls, so it answers within the 3s
         # budget, and a direct (create) response uploads the jacket reliably --
         # the post-defer edit path does not.
         async with async_session() as db:
+            night = is_night(await _viewer_zone(db, ctx.interaction))
             if not query:
                 rendered = _prompt(None)
             else:
@@ -638,8 +651,7 @@ async def _on_song_component(event: hikari.InteractionCreateEvent) -> None:
         return
 
     locale = interaction.locale
-    night = is_night(int(interaction.user.id))
-    rendered = await _dispatch_component(interaction, parts, locale, night)
+    rendered = await _dispatch_component(interaction, parts, locale)
     if rendered is None:
         return
     # Edit via edit_initial_response, not MESSAGE_UPDATE: only the edit builder
@@ -678,14 +690,28 @@ async def _delete_after(
         pass  # already gone (dismissed, or another edit deleted it)
 
 
+async def _viewer_zone(
+    db: AsyncSession,
+    interaction: hikari.CommandInteraction | hikari.ComponentInteraction,
+) -> ZoneInfo:
+    """The clock this viewer's context runs on -- guild override, else default."""
+    return await effective_zone(
+        db,
+        ConfigService(),
+        guild_id=int(interaction.guild_id) if interaction.guild_id is not None else None,
+        channel_id=int(interaction.channel_id),
+        user_id=int(interaction.user.id),
+    )
+
+
 async def _dispatch_component(
     interaction: hikari.ComponentInteraction,
     parts: list[str],
     locale: object,
-    night: bool,
 ) -> _Rendered | None:
     kind = parts[1]
     async with async_session() as db:
+        night = is_night(await _viewer_zone(db, interaction))
         if kind == "s":
             return await _render_song(db, ":".join(parts[2:]), locale, night)
         if kind == "c":
@@ -708,5 +734,11 @@ async def _render_pager(
     if not isinstance(res, ChartList):
         return None
     return await _render_list(
-        db, res.difficulty_ids, token=token, diff_char=diff_char, page=page, locale=locale
+        db,
+        res.difficulty_ids,
+        token=token,
+        diff_char=diff_char,
+        page=page,
+        locale=locale,
+        truncated=res.truncated,
     )

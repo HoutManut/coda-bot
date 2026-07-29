@@ -20,7 +20,7 @@ aliases: ["11 — Ownership declaration via a static picker + pasted blob"]
 A sketch (not a design) for how a tournament song pool could know which
 charts each participant can actually play, given lowiro reports owned packs
 on tier 2 but **never** reports unlocked state, and reports nothing at all on
-the friend path. Directly answers the gap [[Tournaments]] §9 names as "out of
+the friend path. Directly answers the gap [[tournaments|Tournaments]] §9 names as "out of
 scope." **Status: sketch from one conversation, not a design — re-open the
 discussion before building.**
 
@@ -57,4 +57,4 @@ that before anything here is built.
 
 ## Feeds
 
-`[[Tournaments]]` §9, `[[h-ownership-blob-open-before-building]]`
+[[tournaments|Tournaments]] §9, [[h-ownership-blob-open-before-building]]

@@ -7,8 +7,9 @@ shared by every ``/song`` render path.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import hikari
 
@@ -17,12 +18,7 @@ from coda.db.models import Song, SongDifficulty
 
 JACKETS_DIR = Path("assets/jackets")
 # Shown when a song/chart resolves to no jacket file at all.
-BASE_JACKET = JACKETS_DIR / "base.jpg"
-
-# GMT+7 until an opt-in /timezone preference exists (handoff 09 §12). is_night
-# ignores user_id today; the signature keeps the seam so per-user lands with no
-# change to render code.
-_OFFSET = timezone(timedelta(hours=7))
+BASE_JACKET = JACKETS_DIR / "base.webp"
 
 # Songs shipping a locale/time variant jacket.
 _JP_VARIANTS: frozenset[str] = frozenset({"solitarydream"})
@@ -35,16 +31,16 @@ def is_jp_locale(locale: object) -> bool:
 
 
 def display_name(name_en: str, name_jp: str | None, locale: object) -> str:
-    """The effective localised name: JP name for a JP viewer when it differs,
+    """The effective localized name: JP name for a JP viewer when it differs,
     else the English name."""
     if is_jp_locale(locale) and name_jp and name_jp != name_en:
         return name_jp
     return name_en
 
 
-def is_night(user_id: int, now: datetime | None = None) -> bool:
-    """Whether it is night for the viewer. 06:00–19:59 (GMT+7) is day."""
-    local = (now or datetime.now(_OFFSET)).astimezone(_OFFSET)
+def is_night(zone: ZoneInfo, now: datetime | None = None) -> bool:
+    """Whether it is night on that clock. 06:00–19:59 is day."""
+    local = (now or datetime.now(zone)).astimezone(zone)
     return not (6 <= local.hour < 20)
 
 
@@ -59,7 +55,7 @@ def jacket_path(
     if jp and song_id in _JP_VARIANTS:
         stems.insert(0, f"{base_stem}_JP")
     for stem in stems:
-        candidate = JACKETS_DIR / f"{stem}.jpg"
+        candidate = JACKETS_DIR / f"{stem}.webp"
         if candidate.exists():
             return candidate
     return None

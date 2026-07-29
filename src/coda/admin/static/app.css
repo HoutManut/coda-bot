@@ -16,6 +16,32 @@
   --mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+/* --- tint roles --------------------------------------------------------
+   `admin/tints.py` emits `--h` (an OKLCH hue angle from catalog/colors.py) and
+   the roles below derive every tinted surface from it at FIXED lightness and
+   chroma. That is what makes the palette read as one system: each chip has the
+   same contrast against the same background whatever its hue, so the eye reads
+   position and label, never "the red one is louder".
+
+   Measured WCAG ratios at these values (worst hue, 219.5deg): --tint-ink on
+   --tint-bg 5.09:1, --tint-edge on --bg 3.92:1, --tint-line on --bg only
+   1.44:1. That last number is why --tint-line is drawn ONLY against a
+   --tint-bg fill and never against the page. Re-measure if colors.py changes. */
+.tinted {
+  --tint-bg:   oklch(0.965 0.030 var(--h));  /* row / chip fill              */
+  --tint-line: oklch(0.880 0.065 var(--h));  /* border ADJACENT to a fill    */
+  --tint-edge: oklch(0.580 0.120 var(--h));  /* side edge ON the page bg     */
+  --tint-ink:  oklch(0.500 0.110 var(--h));  /* chip text, focus ring        */
+}
+/* A near-neutral source (Colorless/Lephon) has no hue to derive from, so the
+   roles fall back to the page greys rather than inventing a colour. */
+.tinted.neutral {
+  --tint-bg: var(--bg);
+  --tint-line: var(--line);
+  --tint-edge: var(--line-strong);
+  --tint-ink: var(--muted);
+}
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
@@ -108,13 +134,13 @@ input:focus, select:focus {
 }
 /* Inside a chart, focus + drop highlights adopt that difficulty's tint. */
 .chart input:focus, .chart select:focus {
-  border-color: var(--c);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent);
+  border-color: var(--tint-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint-ink) 22%, transparent);
 }
 .chart .jacket-drop:hover, .chart .jacket-drop:focus, .chart .jacket-drop.over {
-  border-color: var(--c);
+  border-color: var(--tint-ink);
 }
-.chart .jacket-drop.over { background: color-mix(in srgb, var(--c) 12%, transparent); }
+.chart .jacket-drop.over { background: var(--tint-bg); }
 input::placeholder { color: var(--faint); }
 input:disabled { background: #f5f4f1; color: var(--faint); }
 input[type=checkbox] { min-width: 0; width: 16px; height: 16px; accent-color: var(--accent); }
@@ -167,6 +193,159 @@ td { padding: .6rem .7rem; border-bottom: 1px solid var(--line); }
 tbody tr { cursor: pointer; transition: background .12s; }
 tbody tr:hover { background: #f6f5f2; }
 
+/* --- list rows ---------------------------------------------------------
+   One grid primitive, two column templates (.songs / .charts). Rows are <a>,
+   not <tr onclick>: that is what restores tabbing, middle-click and ctrl-click
+   and makes the row visible to a screen reader. The cost is the native <table>
+   semantics, which a single-operator local tool can afford. */
+.rows { display: flex; flex-direction: column; }
+.row-head, .rows .row {
+  display: grid; align-items: center;
+  gap: .15rem .7rem; padding: .5rem .7rem;
+}
+.rows.songs .row-head, .rows.songs .row {
+  grid-template-columns: 3.2rem 44px minmax(0, 1fr) auto;
+}
+.rows.songs .row { grid-template-areas: "idx jacket name id" ". jacket line2 line2"; }
+.rows.songs .row-head { grid-template-areas: "idx jacket name id"; }
+.rows.charts .row-head, .rows.charts .row {
+  grid-template-columns: 3.2rem 44px minmax(0, 1fr) auto;
+}
+.rows.charts .row { grid-template-areas: "idx jacket name id" ". jacket line2 line2"; }
+.rows.charts .row-head { grid-template-areas: "idx jacket name id"; }
+/* Chart mode's header carries six sort keys over four columns; let the trailing
+   ones share the last cell rather than widening the grid. */
+.rows.charts .row-head { display: flex; flex-wrap: wrap; gap: .7rem 1.1rem; }
+
+/* Songs | Charts segmented control. */
+.head-tools { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin: 0 0 .8rem; }
+.segmented { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
+.segmented a {
+  padding: .38rem .85rem; font-size: .85rem; font-weight: 600;
+  color: var(--muted); text-decoration: none; background: var(--surface); transition: .12s;
+}
+.segmented a + a { border-left: 1px solid var(--line-strong); }
+.segmented a:hover { color: var(--ink); }
+.segmented a.active { background: var(--accent); color: #fff; }
+.row-head {
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: .35rem; gap: .7rem;
+}
+.row-head .sort {
+  color: var(--muted); text-decoration: none;
+  font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+  transition: color .12s;
+}
+.row-head .sort:hover { color: var(--ink); }
+.row-head .sort.active { color: var(--accent); }
+
+.rows .row {
+  position: relative; text-decoration: none; color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--tint-edge);
+  transition: background .12s;
+}
+.rows .row:hover { background: #f6f5f2; }
+.rows .row:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px; background: #f6f5f2;
+}
+
+.r-idx { grid-area: idx; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.r-jacket {
+  grid-area: jacket; width: 44px; height: 44px; object-fit: cover;
+  border-radius: 5px; border: 1px solid var(--line); background: #f0efeb;
+}
+/* A missing stem gets the song's own side tint, not a broken-image glyph. */
+.r-jacket-none { background: var(--tint-bg); border-color: var(--tint-line); }
+.r-name { grid-area: name; font-weight: 500; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-id { grid-area: id; justify-self: end; }
+/* Line 2 holds the metadata and the chart strip on ONE line; they only wrap to
+   two below 900px. Both are --muted — only the chart chips carry colour. */
+.r-line2 {
+  grid-area: line2; display: flex; align-items: center; gap: .6rem; min-width: 0;
+}
+.r-meta {
+  display: flex; align-items: center; gap: .35rem; min-width: 0;
+  color: var(--muted); font-size: .82rem;
+}
+/* Pack is the only unbounded string here, so it is the only one allowed to
+   truncate — version and date are short and tabular, which keeps the ellipsis
+   at the same x-position on every row. */
+.r-pack { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.r-sep { color: var(--faint); flex: none; }
+.r-version, .r-date { flex: none; font-variant-numeric: tabular-nums; }
+/* The stored second diverges from the displayed day by design; the marker is
+   what makes that visible rather than magic. */
+.r-offset { font-family: var(--mono); font-size: .82em; color: var(--faint); margin-left: .15rem; }
+.r-strip {
+  display: flex; align-items: center; gap: .3rem;
+  flex: none; margin-left: auto;
+}
+.r-lv { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; margin-right: .25rem; }
+.empty { padding: 1.2rem .7rem; }
+/* A missing value is visibly not a value, without shouting. */
+.sentinel {
+  color: var(--faint); font-style: italic;
+  text-decoration: underline dotted; text-underline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .r-line2 { flex-wrap: wrap; }
+  .r-strip { margin-left: 0; width: 100%; flex-wrap: wrap; }
+}
+
+/* --- filter bar --------------------------------------------------------- */
+#controls { display: block; }
+.filterbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.4rem;
+  padding: .7rem .9rem; margin: 0 0 .8rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.fgroup { display: flex; align-items: center; gap: .4rem; }
+.flabel {
+  font-size: .68rem; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted);
+}
+.fpills { display: flex; flex-wrap: wrap; gap: .3rem; }
+/* The checkbox itself is hidden; the label is the pill. */
+.fpill { flex-direction: row; margin: 0; text-transform: none; letter-spacing: 0; }
+.fpill input { position: absolute; opacity: 0; width: 0; height: 0; }
+.fpill > span {
+  display: inline-block; cursor: pointer; user-select: none;
+  font-size: .68rem; font-weight: 700; letter-spacing: .05em;
+  padding: .18rem .45rem; border-radius: 5px;
+  color: var(--tint-ink, var(--muted));
+  background: transparent;
+  border: 1px solid transparent; transition: .12s;
+}
+.fpill > span:hover { border-color: var(--tint-line, var(--line-strong)); }
+.fpill input:checked + span {
+  background: var(--tint-bg, var(--accent-soft));
+  border-color: var(--tint-line, var(--accent));
+}
+.fpill.dashed input:checked + span { border-style: dashed; }
+.fpill input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fgap > span { font-weight: 600; text-transform: none; letter-spacing: 0; font-size: .72rem;
+  color: var(--muted); border-color: var(--line); }
+.fgap input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.fnum { min-width: 0; width: 4.5rem; padding: .25rem .4rem; font-size: .82rem; }
+/* A date that isn't a formattable unix second falls back to the raw field. */
+.date-bad { color: var(--danger); }
+.date-bad input { border-color: #e0b6af; }
+.fdash { color: var(--faint); }
+
+/* Active filters, echoed as removable chips so what is applied is legible. */
+.fchips { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 0 0 .8rem; }
+.fchip {
+  display: inline-flex; align-items: center; gap: .2rem;
+  background: var(--accent-soft); border: 1px solid #a7cdb8; color: var(--accent);
+  border-radius: 16px; padding: .1rem .25rem .1rem .6rem; font-size: .78rem; font-weight: 600;
+}
+.fclear { color: var(--muted); font-size: .78rem; text-decoration: underline; margin-left: .3rem; }
+.fclear:hover { color: var(--danger); }
+.fnotice { color: var(--muted); font-size: .8rem; margin: 0 0 .8rem; font-style: italic; }
+
 /* --- pager ------------------------------------------------------------- */
 .pager {
   display: flex; align-items: center; justify-content: space-between;
@@ -192,13 +371,15 @@ tbody tr:hover { background: #f6f5f2; }
 
 /* --- charts (difficulty accordions) ----------------------------------- */
 details.chart {
-  --c: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line));
-  border-left: 4px solid var(--c);
+  border: 1px solid var(--tint-line);
+  border-left: 4px solid var(--tint-edge);
   border-radius: 6px; padding: .6rem .95rem; margin: .55rem 0;
-  background: color-mix(in srgb, var(--c) 12%, var(--surface));
+  background: var(--tint-bg);
 }
-details.chart[open] { background: color-mix(in srgb, var(--c) 8%, var(--surface)); }
+details.chart[open] { background: color-mix(in srgb, var(--tint-bg) 55%, var(--surface)); }
+/* BYD_2 and ERR share a hue with BYD and FTR (see tints.DASHED_CLASSES); the
+   duplicate is marked on the border style, which colourblindness can't erase. */
+details.chart.dashed { border-style: dashed; border-left-style: solid; }
 details.chart > summary {
   cursor: pointer; font-weight: 600; list-style: none;
   display: flex; align-items: center; gap: .7rem;
@@ -206,9 +387,14 @@ details.chart > summary {
 details.chart > summary::-webkit-details-marker { display: none; }
 details.chart > form { padding-top: .6rem; }
 details.chart > summary::before {
-  content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); flex: none;
+  content: ""; width: 8px; height: 8px; border-radius: 2px;
+  background: var(--tint-edge); flex: none;
 }
-details.chart.add { --c: var(--line-strong); border-style: dashed; }
+details.chart.add {
+  --tint-bg: var(--bg); --tint-line: var(--line-strong);
+  --tint-edge: var(--line-strong); --tint-ink: var(--muted);
+  border-style: dashed;
+}
 details.overrides { width: 100%; margin: .3rem 0; }
 details.overrides > summary { cursor: pointer; color: var(--muted); font-size: .82rem; }
 
@@ -220,15 +406,6 @@ details.diff-extras .diff-links,
 details.diff-extras .diff-aliases { border-top: 0; padding-top: 0; margin: .7rem 0 0; }
 
 details.diff-tags > summary { cursor: pointer; color: var(--muted); font-size: .82rem; font-weight: 600; }
-/* Tints from the in-game difficulty palette, desaturated to sit on the light UI. */
-/* Scoped to .chart so they outrank `details.chart { --c }` specificity. */
-.chart.diff-pst   { --c: #5a93c4; }  /* Past — blue */
-.chart.diff-prs   { --c: #90ac52; }  /* Present — green */
-.chart.diff-ftr   { --c: #b15a9b; }  /* Future — magenta */
-.chart.diff-etr   { --c: #8f7bbf; }  /* Eternal — lavender */
-.chart.diff-byd   { --c: #b3564c; }  /* Beyond — red-brown */
-.chart.diff-byd_2 { --c: #c06a3e; }  /* Beyond 2 — deep orange */
-.chart.diff-err   { --c: #c44fa6; }  /* Error — bright magenta */
 
 /* Song-list header: title left, sort toggle right. */
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -241,21 +418,15 @@ details.diff-tags > summary { cursor: pointer; color: var(--muted); font-size: .
 }
 .sort-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Filled difficulty chips (entity song lists). Same palette as the accordions. */
+/* Filled difficulty chips. Same derivation as the accordions — one palette. */
 .diff-chip {
   display: inline-block; vertical-align: middle;
-  font-size: .6rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--c, var(--muted));
-  background: color-mix(in srgb, var(--c, var(--muted)) 14%, transparent);
+  font-size: .6rem; font-weight: 700; letter-spacing: .06em;
+  color: var(--tint-ink); background: var(--tint-bg);
+  border: 1px solid var(--tint-line);
   border-radius: 5px; padding: .08rem .4rem;
 }
-.diff-chip.diff-pst   { --c: #5a93c4; }
-.diff-chip.diff-prs   { --c: #90ac52; }
-.diff-chip.diff-ftr   { --c: #b15a9b; }
-.diff-chip.diff-etr   { --c: #8f7bbf; }
-.diff-chip.diff-byd   { --c: #b3564c; }
-.diff-chip.diff-byd_2 { --c: #c06a3e; }
-.diff-chip.diff-err   { --c: #c44fa6; }
+.diff-chip.dashed { border-style: dashed; }
 
 .chart-stat { color: var(--muted); font-weight: 400; font-family: var(--mono); font-size: .8rem; }
 
@@ -434,6 +605,16 @@ ul.tags li .link:hover { opacity: 1; }
   font: inherit; font-size: .85rem; min-width: 4ch; field-sizing: content; }
 .tag-add-input::placeholder { color: var(--cink, var(--faint)); opacity: .6; }
 .tag-add-input:focus { outline: none; box-shadow: none; border-color: var(--cink, var(--cbd)); }
+
+/* Inline entity create — same tinted dashed box as .tag-add, one interaction. */
+.entity-create {
+  margin: .4rem 0 0; padding: .45rem .6rem;
+  background: var(--accent-soft); border: 1px dashed #a7cdb8; border-radius: 8px;
+  align-items: flex-end; gap: .5rem;
+}
+.entity-create label { font-size: .66rem; }
+.entity-create input { padding: .3rem .45rem; font-size: .85rem; min-width: 9ch; }
+.entity-create[hidden] { display: none; }
 
 .divider { border: 0; border-top: 1px dashed var(--line-strong); margin: 1.1rem 0; }
 

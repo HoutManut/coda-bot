@@ -86,7 +86,7 @@ this does not build the engine as a side effect of importing the wire layer.
 `search_index` (§5 of the source doc) is a **materialized view**, not an ORM
 model — it is raw SQL Alembic cannot autogenerate, refreshed after any alias
 write. Sentinel values throughout the catalog: `level`/`rating` use `0` = TBA,
-`-1` = N/A (`err` only); see [[Catalog]] and [[catalog|level encoding]] / [[catalog|CC encoding]]
+`-1` = N/A (`err` only); see [[catalog|Catalog]] and [[catalog|level encoding]] / [[catalog|CC encoding]]
 (domain pages, Tier 1 — not authored by this ingest).
 
 ### Player / session / score (Tier 3 — this ingest's focus)
@@ -156,9 +156,9 @@ the entire persistence layer for coda-bot's catalog and player/score state
 
 ## Related
 
-`[[self-hosting]]`, `[[h-straying-preserves-history]]`,
-`[[h-one-account-per-user]]`, `[[h-login-upgrades-link-in-place]]`,
-`[[h-owner-consent-on-second-claim]]`, `[[h-bot-accounts-excluded-bidirectionally]]`,
-`[[h-no-orm-relationships]]`, `[[Tournaments]]` (reads `play_scores`, writes
-nothing), `[[Live Updates]]` (unbuilt — reads `play_scores` + `live_update_*`),
-`[[b30]]`, `[[Score history backfill]]`
+[[self-hosting]], [[h-straying-preserves-history]],
+[[h-one-account-per-user]], [[h-login-upgrades-link-in-place]],
+[[h-owner-consent-on-second-claim]], [[h-bot-accounts-excluded-bidirectionally]],
+[[h-no-orm-relationships]], [[tournaments|Tournaments]] (reads `play_scores`, writes
+nothing), [[live-updates|Live Updates]] (unbuilt — reads `play_scores` + `live_update_*`),
+[[b30]], [[Score history backfill]]

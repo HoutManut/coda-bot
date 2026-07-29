@@ -34,6 +34,10 @@ class Config:
     # Discord user IDs allowed to set global config and to register reserved
     # codes. A set: for a permission check, order carries no meaning.
     owner_ids: frozenset[int]
+    # Guilds /run is created in. Nothing else limits where the owner terminal
+    # is reachable, so an empty tuple means it exists nowhere -- never None,
+    # which lightbulb reads as "fall back to default_enabled_guilds".
+    owner_guild_ids: tuple[int, ...]
     # The first of OWNER_IDS -- the human to contact when something needs one
     # (an ambiguous friend diff, a stale claim). None if OWNER_IDS is unset.
     main_owner_id: int | None
@@ -58,12 +62,14 @@ class Config:
     @classmethod
     def from_env(cls) -> Config:
         owner_ids = _snowflakes("OWNER_IDS")
+        dev_guild_ids = _snowflakes("DEV_GUILD_IDS")
         discord_log_channel = os.environ.get("LOG_DISCORD_CHANNEL_ID")
         return cls(
             bot_token=_require("BOT_TOKEN"),
-            dev_guild_ids=_snowflakes("DEV_GUILD_IDS"),
+            dev_guild_ids=dev_guild_ids,
             database_url=_require("DATABASE_URL"),
             owner_ids=frozenset(owner_ids),
+            owner_guild_ids=_snowflakes("OWNER_GUILD_IDS") or dev_guild_ids,
             main_owner_id=owner_ids[0] if owner_ids else None,
             fernet_key=_require("FERNET_KEY"),
             owner_friend_code=os.environ.get("OWNER_FRIEND_CODE") or None,
@@ -74,6 +80,7 @@ class Config:
             log_discord_channel_id=int(discord_log_channel) if discord_log_channel else None,
             log_discord_level=os.environ.get("LOG_DISCORD_LEVEL", "WARNING"),
         )
+
 
 
 config = Config.from_env()

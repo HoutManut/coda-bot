@@ -18,9 +18,11 @@ aliases: ["09 — b30"]
 ## Covers
 
 Design for computing, caching, and displaying a player's best-30 from
-accumulated `play_scores` rows. **Status: designed, not built.** Depends on
-nothing unbuilt (the poller landed 2026-07-21). Feeds handoff 08's one settled
-post filter.
+accumulated `play_scores` rows. **Status: computation backend built
+2026-07-23** (`src/coda/scores/b30.py`, see [[h-b30-cache-stores-sum]] for the
+final shape) — **display (a `/b30` command + embed) still not built.** Depends
+on nothing unbuilt (the poller landed 2026-07-21). Feeds handoff 08's one
+settled post filter.
 
 ## Key claims
 
@@ -37,8 +39,9 @@ post filter.
 - Cache columns proposed on `arcaea_accounts`: `b30_sum`, `b30_entry_count`,
   `b30_computed_at`, `reported_rating`, `reported_rating_at`. Store the sum,
   not the average — keeps "divide by what" a display decision.
-  **Not yet present** in `src/coda/db/models/arcaea_account.py` as read for
-  this ingest — confirms `status: designed, not built` at the code level too.
+  **Rejected, not just deferred** — [[h-b30-cache-stores-sum]] (2026-07-23)
+  decided on-demand compute over `play_scores` instead, at least until scale
+  proves it too slow. `arcaea_accounts` carries none of these columns.
 - `/b30` is self-only by design (no target option) — consent is structural,
   not an `is_owner` gate, because a non-owner link was explicitly approved at
   registration time.
@@ -65,6 +68,6 @@ different situation the two docs do not actually disagree about.
 
 ## Feeds
 
-`[[db]]` (proposed `arcaea_accounts` columns, not yet migrated),
-`[[Live Updates]]` (§8, the settled filter input), `[[h-b30-cache-stores-sum]]`
-(decision)
+[[scores]] (`b30.py`, built 2026-07-23), [[h-b30-cache-stores-sum]] (decision — cache
+columns rejected, on-demand compute chosen instead), [[live-updates|Live Updates]]
+(§8, the settled filter input)

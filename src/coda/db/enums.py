@@ -90,6 +90,15 @@ class RequestStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
+class ChardleState(enum.Enum):
+    """Lifecycle of a :class:`~coda.db.models.chardle.ChardleSession`. Stored as
+    the lowercase string value."""
+
+    PLAYING = "playing"
+    WON = "won"
+    LOST = "lost"
+
+
 class Side(enum.Enum):
     """A song's visual theme. Stored as the lowercase string value."""
 
@@ -103,6 +112,10 @@ class Side(enum.Enum):
         """Map the game's numeric side id (0-3) to a member."""
         return _SIDE_BY_ID[value]
 
+    def to_id(self) -> int:
+        """The game's numeric side id, as stored in ``songs.side``."""
+        return _SIDE_IDS[self]
+
 
 _SIDE_BY_ID: dict[int, Side] = {
     0: Side.LIGHT,
@@ -110,6 +123,8 @@ _SIDE_BY_ID: dict[int, Side] = {
     2: Side.COLORLESS,
     3: Side.LEPHON,
 }
+
+_SIDE_IDS: dict[Side, int] = {side: value for value, side in _SIDE_BY_ID.items()}
 
 
 difficulty_class_type: SAEnum = SAEnum(
@@ -133,6 +148,12 @@ link_method_type: SAEnum = SAEnum(
 request_status_type: SAEnum = SAEnum(
     RequestStatus,
     name="request_status",
+    values_callable=lambda e: [m.value for m in e],
+)
+
+chardle_state_type: SAEnum = SAEnum(
+    ChardleState,
+    name="chardle_state",
     values_callable=lambda e: [m.value for m in e],
 )
 

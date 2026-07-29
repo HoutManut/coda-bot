@@ -10,8 +10,10 @@ Call sites stay plain stdlib -- steering is data on the record, set via ``extra`
 
     logger.info("x", extra={"discord": True})     # force onto discord, ignores threshold
     logger.warning("y", extra={"discord": False}) # hold back off discord, ignores threshold
+    logger.error("z", extra={"ping": True})        # also @-mention main_owner_id on discord
 
-The three handler keys are ``console``, ``file`` and ``discord``.
+The three handler keys are ``console``, ``file`` and ``discord``. ``ping`` is a
+separate flag read directly by ``DiscordChannelHandler``, not a routing key.
 """
 
 from __future__ import annotations

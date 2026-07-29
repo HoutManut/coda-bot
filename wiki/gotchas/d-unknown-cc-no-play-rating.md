@@ -14,13 +14,13 @@ aliases: ["An unknown chart constant yields NO play rating — never substitute 
 
 ## Symptom
 
-A newly-released chart with a TBA chart constant (`rating <= 0`, see [[Catalog]]) shows a play
+A newly-released chart with a TBA chart constant (`rating <= 0`, see [[catalog|Catalog]]) shows a play
 rating of `cc + 2` = `2.0` (or similarly nonsensical low number) for a MAX play, or silently
 enters the b30/r10 pool computation with a wrong low rating instead of being excluded.
 
 ## Cause
 
-Play rating is `cc + f(score)` (see [[Potential]] §Encoding) — it is **undefined**, not zero,
+Play rating is `cc + f(score)` (see [[potential|Potential]] §Encoding) — it is **undefined**, not zero,
 when `cc` itself is unknown (`rating <= 0`, the TBA/`err`-only sentinel band shared with
 [[d-level-cc-sentinel-values]]). Treating the sentinel as `cc = 0` produces a plausible-looking
 but fabricated play rating (e.g. `0 + 2 = 2.0`) for what should be "cannot compute" — and that
@@ -39,7 +39,7 @@ was fabricated.
 
 Check `rating <= 0` on the chart **before** calling the play-rating formula and short-circuit to
 an explicit "no play rating" state (`None`, not `0`) for that chart. Newly-released songs with
-TBA CC are a real, expected hole — [[Potential]] §"Inputs are cheap" calls this out directly: a
+TBA CC are a real, expected hole — [[potential|Potential]] §"Inputs are cheap" calls this out directly: a
 chart with unknown CC "yields **no** play rating and simply cannot enter either pool" until the
 catalog is updated with the real value.
 

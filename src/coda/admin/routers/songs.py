@@ -6,14 +6,24 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import (
+    String,
+    case,
+    cast,
+    delete,
+    exists,
+    func,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coda.admin import aliassync
+from coda.admin import aliassync, songfilters
 from coda.admin.deps import get_session
-from coda.admin.forms import parse_song_base
-from coda.admin.listing import paginate
+from coda.admin.forms import form_text, parse_song_base, song_date
+from coda.admin.listing import paginate, paginate_rows
 from coda.admin.presenters import DIFFICULTY_ORDER, tag_chip_style
 from coda.admin.templating import templates
 from coda.catalog.aliases import difficulty_alias_terms, song_alias_terms
@@ -49,6 +59,57 @@ _SONG_COLS = {
     "name": Song.name_en,
     "pack": Song.pack_name,
 }
+
+
+def _difficulty_order_case():
+    """ORDER BY expression putting charts in :data:`DIFFICULTY_ORDER`.
+
+    The column is a DB enum, so ordering by it would give declaration order --
+    which puts BYD before ETR, disagreeing with the detail page.
+    """
+    # Compared as text: the column is a native PG enum, so binding the ordering
+    # keys as plain strings gives "operator does not exist: difficulty_class =
+    # character varying".
+    return case(
+        {d.value: i for i, d in enumerate(DIFFICULTY_ORDER)},
+        value=cast(SongDifficulty.difficulty, String),
+        else_=99,
+    )
+
+
+_CHART_COLS = {
+    "idx": Song.idx,
+    "song_id": Song.song_id,
+    "name": Song.name_en,
+    "pack": Song.pack_name,
+    "difficulty": _difficulty_order_case(),
+    "level": SongDifficulty.level,
+    "cc": SongDifficulty.rating,
+    "note": SongDifficulty.note,
+}
+
+
+def _song_search(pattern: str):
+    """Songs matching ``pattern`` on any alias.
+
+    EXISTS rather than a join: a join fans out one row per matching alias, which
+    then needs DISTINCT, which in turn has to agree with the ORDER BY of
+    whichever column is being sorted on.
+    """
+    return exists().where(
+        SongAlias.song_id == Song.song_id, SongAlias.alias.ilike(pattern)
+    )
+
+
+def _chart_search(pattern: str):
+    """Charts matching ``pattern`` on a song alias *or* a per-chart alias."""
+    return or_(
+        _song_search(pattern),
+        exists().where(
+            DifficultyAlias.difficulty_id == SongDifficulty.id,
+            DifficultyAlias.alias.ilike(pattern),
+        ),
+    )
 
 
 async def _datalist_options(session: AsyncSession) -> dict:
@@ -137,26 +198,91 @@ async def _tag_options(session: AsyncSession) -> dict:
     }
 
 
+async def _chart_strips(
+    session: AsyncSession, song_ids: list[str]
+) -> dict[str, list[SongDifficulty]]:
+    """Every chart of the songs on screen, grouped by song in display order.
+
+    One query for the whole page: the row's chart strip is its headline feature
+    and ``paginate`` selects ``Song`` alone, so templating it off the song would
+    fire a lazy load per row.
+    """
+    if not song_ids:
+        return {}
+    rows = (
+        await session.scalars(
+            select(SongDifficulty).where(SongDifficulty.song_id.in_(song_ids))
+        )
+    ).all()
+    order = {d: i for i, d in enumerate(DIFFICULTY_ORDER)}
+    strips: dict[str, list[SongDifficulty]] = {sid: [] for sid in song_ids}
+    for row in rows:
+        strips[row.song_id].append(row)
+    for charts in strips.values():
+        charts.sort(key=lambda c: order.get(c.difficulty, 99))
+    return strips
+
+
+async def _list_songs(request, session: AsyncSession, q: str, extra: dict) -> dict:
+    base = select(Song)
+    if q:
+        base = base.where(_song_search(f"%{q}%"))
+    page = await paginate(
+        session, base, request=request, columns=_SONG_COLS,
+        default_sort="idx", path="/songs", q=q, extra=extra,
+    )
+    return {
+        "page": page,
+        "strips": await _chart_strips(session, [s.song_id for s in page.items]),
+    }
+
+
+async def _list_charts(
+    request, session: AsyncSession, q: str, extra: dict, filters: songfilters.ChartFilters
+) -> dict:
+    base = select(Song, SongDifficulty).join(
+        SongDifficulty, SongDifficulty.song_id == Song.song_id
+    )
+    if q:
+        base = base.where(_chart_search(f"%{q}%"))
+    for predicate in filters.predicates():
+        base = base.where(predicate)
+    page = await paginate_rows(
+        session, base, request=request, columns=_CHART_COLS,
+        default_sort="idx", path="/songs", q=q, extra=extra,
+    )
+    return {"page": page}
+
+
 @router.get("/songs", response_class=HTMLResponse)
 async def list_songs(
     request: Request,
     q: str = "",
+    mode: str = "songs",
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
     q = q.strip()
-    base = select(Song)
-    if q:
-        # Match any alias (id, names, manual terms) — same surface the bot searches.
-        base = (
-            base.join(SongAlias, SongAlias.song_id == Song.song_id)
-            .where(SongAlias.alias.ilike(f"%{q}%"))
-            .distinct()
-        )
-    page = await paginate(
-        session, base, request=request, columns=_SONG_COLS,
-        default_sort="idx", path="/songs", q=q,
+    if mode not in ("songs", "charts"):
+        mode = "songs"
+    filters = songfilters.parse(request.query_params)
+    # A chart-level filter cannot mean anything against one row per song, so it
+    # forces charts mode -- and says so, rather than switching silently.
+    switched = filters.active and mode == "songs"
+    if switched:
+        mode = "charts"
+    extra = filters.extra(mode)
+    if mode == "charts":
+        context = await _list_charts(request, session, q, extra, filters)
+    else:
+        context = await _list_songs(request, session, q, extra)
+    return templates.TemplateResponse(
+        request,
+        "song_list.html",
+        {
+            "mode": mode, "filters": filters, "switched": switched,
+            "gap_choices": songfilters.GAP_CHOICES, **context,
+        },
     )
-    return templates.TemplateResponse(request, "song_list.html", {"page": page})
 
 
 @router.get("/songs/new", response_class=HTMLResponse)
@@ -176,21 +302,25 @@ async def new_song_form(
     )
 
 
-@router.post("/songs", response_class=HTMLResponse)
+@router.post("/songs", response_class=HTMLResponse, response_model=None)
 async def create_song(
     request: Request, session: AsyncSession = Depends(get_session)
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     form = await request.form()
-    song_id = (form.get("song_id") or "").strip()
-    idx_raw = (form.get("idx") or "").strip()
+    song_id = form_text(form, "song_id").strip()
+    idx_raw = form_text(form, "idx").strip()
 
     async def _error(msg: str) -> HTMLResponse:
         packs = (await session.scalars(select(Pack).order_by(Pack.name))).all()
         return templates.TemplateResponse(
             request,
             "song_form.html",
+            # posted_date is reconstructed here because the date arrives as a
+            # day/offset pair; re-reading a plain "date" field off the form
+            # would silently drop it on every validation error.
             {"song": None, "packs": packs, "suggested_idx": idx_raw, "error": msg,
              "form": form, "default_pack_id": DEFAULT_PACK_ID,
+             "posted_date": song_date(form),
              **(await _datalist_options(session))},
             status_code=400,
         )
@@ -210,6 +340,18 @@ async def create_song(
     # Pack defaults to the base game pack when none is picked (and base exists).
     if fields["pack_id"] is None and await session.get(Pack, DEFAULT_PACK_ID):
         fields["pack_id"] = DEFAULT_PACK_ID
+
+    # Unlike idx, a taken date bumps on create rather than erroring: an idx
+    # collision usually means a typo, whereas a pack releasing several songs on
+    # one day makes a date collision the expected case.
+    notice = ""
+    if fields["date"]:
+        try:
+            notice = await _reserve_date(session, fields["date"], None)
+        except DateConflict as exc:
+            await session.rollback()
+            return await _error(str(exc))
+
     song = Song(song_id=song_id, idx=idx, **fields)
     session.add(song)
     await session.flush()
@@ -218,7 +360,10 @@ async def create_song(
         new_name_en=fields["name_en"], new_name_jp=fields["name_jp"],
     )
     await session.commit()
-    return RedirectResponse(url=f"/songs/{song_id}", status_code=303)
+    url = f"/songs/{song_id}"
+    if notice:
+        url += f"?notice={quote(notice)}"
+    return RedirectResponse(url=url, status_code=303)
 
 
 @router.get("/songs/{song_id}", response_class=HTMLResponse)
@@ -410,10 +555,89 @@ async def _move_idx(session: AsyncSession, song: Song, new_idx: int) -> str:
     return warning
 
 
-@router.post("/songs/{song_id}", response_class=HTMLResponse)
+class DateConflict(Exception):
+    """A chart's explicit date override holds a second the cascade needs."""
+
+
+async def _plan_date_shift(
+    session: AsyncSession, date: int, keep_song_id: str | None
+) -> list[tuple[str, int]]:
+    """``(song_id, new_date)`` moves needed to free ``date``, in cascade order.
+
+    Walks the contiguous run of occupied seconds from ``date`` upward, giving
+    each song the next free second and stopping at the first gap. Songs already
+    sharing a second (the catalog holds such groups) are spread apart rather
+    than moved on top of each other.
+    """
+    occupants = (
+        await session.execute(
+            select(Song.song_id, Song.date)
+            .where(Song.date >= date, Song.song_id != (keep_song_id or ""))
+            .order_by(Song.date, Song.song_id)
+        )
+    ).all()
+    if not any(second == date for _, second in occupants):
+        return []
+
+    moves: list[tuple[str, int]] = []
+    cursor = date
+    for song_id, second in occupants:
+        if second > cursor:
+            break
+        cursor += 1
+        moves.append((song_id, cursor))
+    return moves
+
+
+async def _reserve_date(
+    session: AsyncSession, date: int, keep_song_id: str | None
+) -> str:
+    """Make ``date`` free for the song being saved, shifting incumbents up.
+
+    Mirrors :func:`_move_idx`: the saved song keeps the second it asked for and
+    the incumbents move, so a value is never silently changed out from under the
+    operator. ``songs.date`` has no UNIQUE constraint (unlike ``idx``), so no
+    parking step is needed.
+
+    Raises :class:`DateConflict` if the target second, or any second the cascade
+    would move a song onto, is held by a chart's explicit date override. Those
+    are deliberate placements and auto-moving one would silently undo an
+    intentional decision; charts that inherit (``date IS NULL``) resolve to their
+    song's second by construction and cannot collide.
+    """
+    moves = await _plan_date_shift(session, date, keep_song_id)
+    highest = moves[-1][1] if moves else date
+
+    blocking = (
+        await session.execute(
+            select(SongDifficulty.song_id, SongDifficulty.difficulty)
+            .where(SongDifficulty.date.between(date, highest))
+        )
+    ).all()
+    if blocking:
+        names = ", ".join(f"{sid} {diff.value}" for sid, diff in blocking)
+        raise DateConflict(
+            f"second {date} is held by a chart's own date override ({names}). "
+            "Change that chart's date first."
+        )
+
+    if not moves:
+        return ""
+    for song_id, new_date in moves:
+        await session.execute(
+            update(Song).where(Song.song_id == song_id).values(date=new_date)
+        )
+    await session.flush()
+    return (
+        f"date {date} was taken — shifted "
+        f"{', '.join(song_id for song_id, _ in moves)} up to make room."
+    )
+
+
+@router.post("/songs/{song_id}", response_class=HTMLResponse, response_model=None)
 async def update_song(
     request: Request, song_id: str, session: AsyncSession = Depends(get_session)
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     song = await session.get(Song, song_id)
     if song is None:
         return HTMLResponse("Song not found", status_code=404)
@@ -422,7 +646,7 @@ async def update_song(
 
     # idx is editable; a collision shifts the occupant(s) up rather than erroring.
     notice = ""
-    idx_raw = (form.get("idx") or "").strip()
+    idx_raw = form_text(form, "idx").strip()
     if idx_raw:
         try:
             new_idx = int(idx_raw)
@@ -433,6 +657,15 @@ async def update_song(
 
     old_name_en, old_name_jp = song.name_en, song.name_jp
     fields = parse_song_base(form)
+    if fields["date"] and fields["date"] != song.date:
+        try:
+            shifted = await _reserve_date(session, fields["date"], song.song_id)
+        except DateConflict as exc:
+            await session.rollback()
+            return RedirectResponse(
+                f"/songs/{song_id}?error={quote(str(exc))}", status_code=303
+            )
+        notice = " ".join(filter(None, (notice, shifted)))
     for key, value in fields.items():
         setattr(song, key, value)
     await aliassync.sync_song(
@@ -458,7 +691,7 @@ async def rename_song(
     if song is None:
         return HTMLResponse("Song not found", status_code=404)
     form = await request.form()
-    new_id = (form.get("new_id") or "").strip()
+    new_id = form_text(form, "new_id").strip()
 
     def _err(msg: str) -> RedirectResponse:
         return RedirectResponse(f"/songs/{song_id}?error={quote(msg)}", status_code=303)

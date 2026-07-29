@@ -38,6 +38,7 @@ from coda.players import (
     ReservedCodeError,
 )
 from coda.players.link_approval import request_link
+from coda.players.live import LiveUpdateService
 from coda.players.service import (
     LeftShared,
     NeedsApproval,
@@ -75,12 +76,25 @@ _LINK_BENEFITS = (
     "Linking adds, for every play:\n"
     "• **Note breakdown**: pure / far / lost, and shiny pure\n"
     "• **Clear type** and the RR for the play\n\n"
-    "**B30** works either way, but linking — especially with an active "
-    "Arcaea Online subscription — makes it and your **rating progression** far "
+    "**B30** works either way, but linking, especially with an active "
+    "Arcaea Online subscription, makes it and your rating far "
     "more reliable to track.\n\n"
     "Your email and password are **encrypted before they're stored** and are "
     "used only to read your own scores. You can remove them any time with "
     "`/unlink` — your scores keep tracking without them."
+)
+
+_TOS_NOTICE = (
+    "\n\n**Before you continue:** coda-bot is unofficial and reads an "
+    "undocumented, private Arcaea API. Using it and linking your login "
+    "means accepting that this breaks Arcaea's Terms of Service. See the "
+    "project README for the full disclosure. By linking, you accept this risk."
+)
+
+_ACCOUNT_METHOD_BLOCKED = (
+    "\n\n**Account linking is temporarily disabled.** The host is running a "
+    "long testing session using only bot accounts. Use `/register` with the "
+    "friend code method for now."
 )
 
 
@@ -119,18 +133,18 @@ def _error_message(exc: Exception) -> str:
         case AmbiguousFriend():
             return (
                 "Something's out of sync on our side and I can't tell which "
-                "account is yours. A bot admin needs to look — there's nothing "
+                "account is yours. A bot admin needs to look. There's nothing "
                 "wrong with your code."
             )
         case NoCapacity():
             return (
                 "Cannot add by friend code anymore at the moment. "
-                "Please let an admin know."
+                "I have notified the bot owner about this, please try again at a later time."
             )
         case InvalidCredentials():
             return (
-                "Arcaea rejected that email or password. **Nothing was saved**. "
-                "Csheck them and try again."
+                "Arcaea rejected that email or password. "
+                "Check them and try again."
             )
         case ArcaeaError():
             return "Arcaea's API returned something unexpected. Please try again shortly."
@@ -147,39 +161,89 @@ async def _respond_error(ctx: lightbulb.components.ModalContext, exc: Exception)
     )
 
 
-def _welcome_embed(name: str | None, rating: float | None) -> hikari.Embed:
+def _welcome_embed(
+    name: str | None, rating: float | None, *, channel_enable: bool
+) -> hikari.Embed:
     """The in-channel welcome after a successful registration (either path).
-
-    Ephemeral and in-channel on purpose -- the old welcome was a DM and was
-    dropped (see dm-path-reliable). Greets by name, shows potential only when the
-    API gave us one (None = hidden in-game; the wire sentinel for hidden decodes
-    to -0.01, so never render it as zero), and says where live updates go.
     """
     embed = hikari.Embed(
         title=f"Welcome, {name}!" if name else "Welcome!",
         description=(
-            "Your Arcaea account is linked. I'll keep an eye on your plays from here."
+            "Your Arcaea account is linked."
         ),
         color=_COLOR_OK,
     )
     if rating is not None:
         embed.add_field(name="Potential", value=f"{rating:.2f}", inline=True)
     embed.add_field(
-        name="Live updates",
+        name="Tracking",
         value=(
-            "They're **on**, and they'll arrive in your **DMs**.\n\n"
-            "Prefer them in a server? Use `/liveupdates channel` there — you can "
-            "pick any channel that server has enabled for score updates. "
-            "`/liveupdates off` stops them entirely."
+            "**On** by default. Every play gets recorded. Turn it off with "
+            "`/tracking off` any time."
         ),
         inline=False,
     )
+    live_value = (
+        "Currently **off** by default. Enable them for this channel with the "
+        "button below, or `/liveupdates channel` to pick somewhere else "
+        "(including your DMs)."
+        if channel_enable
+        else "Currently **off** by default. Turn them on with `/liveupdates on` "
+        "(defaults to your DMs), or `/liveupdates channel` to pick an allowed "
+        "channel."
+    )
+    embed.add_field(name="Live updates", value=live_value, inline=False)
     return embed
 
 
-def _registered_embed(result: Registration) -> hikari.Embed:
-    """The ephemeral in-channel welcome after a code registration."""
-    return _welcome_embed(result.display_name, result.rating)
+async def _send_welcome(
+    ctx: lightbulb.components.ModalContext,
+    live: LiveUpdateService,
+    name: str | None,
+    rating: float | None,
+) -> None:
+    """Send the welcome embed, attaching an "enable here" button when the
+    invoking channel is already allowlisted for live updates.
+
+    Most users never leave the channel they registered in to run
+    `/liveupdates channel`, so the one-click path is worth the extra round
+    trip; elsewhere the embed just points at the commands.
+    """
+    channel_id = int(ctx.channel_id)
+    async with async_session() as db:
+        allowed = await live.is_allowed(db, channel_id)
+
+    embed = _welcome_embed(name, rating, channel_enable=allowed)
+
+    if not allowed:
+        await ctx.respond(embed=embed, ephemeral=True)
+        return
+
+    caller_id = ctx.user.id
+    menu = lightbulb.components.Menu()
+
+    async def on_enable(mctx: lightbulb.components.MenuContext) -> None:
+        if mctx.user.id != caller_id:
+            await mctx.respond("This button isn't for you.", ephemeral=True)
+            return
+        async with async_session() as db:
+            await live.set_destination(db, caller_id, channel_id)
+            await live.set_enabled(db, caller_id, True)
+        await mctx.respond(
+            f"Live updates are on, posting in <#{channel_id}>.",
+            edit=True,
+            components=[],
+        )
+        mctx.stop_interacting()
+
+    menu.add_interactive_button(
+        hikari.ButtonStyle.SUCCESS, on_enable, label="Enable live updates here"
+    )
+    await ctx.respond(embed=embed, components=menu, ephemeral=True)
+    try:
+        await menu.attach(ctx.client, timeout=_CONSENT_TIMEOUT)
+    except asyncio.TimeoutError:
+        logger.debug("welcome live-update button timed out for %s", caller_id)
 
 
 def _info_embed(text: str) -> hikari.Embed:
@@ -196,14 +260,10 @@ def _linked_name(
     return account.display_name or account.friend_code
 
 
-def _account_linked_embed(
-    result: Registration | ProvenOverCode | ProvenCoexists,
-) -> hikari.Embed:
-    """The ephemeral in-channel welcome after linking a login. Same for all proven
-    outcomes; potential shows only when we just learned it (a fresh Registration
+def _linked_rating(result: Registration | ProvenOverCode | ProvenCoexists) -> float | None:
+    """Potential shows only when we just learned it (a fresh Registration
     carries it -- the proven-coexist path is an already-known account)."""
-    rating = result.rating if isinstance(result, Registration) else None
-    return _welcome_embed(_linked_name(result), rating)
+    return result.rating if isinstance(result, Registration) else None
 
 
 def _coexist_notice_embed(account) -> hikari.Embed:
@@ -226,10 +286,10 @@ def _stale_prompt_embed(result: ProvenOverCode) -> hikari.Embed:
     return hikari.Embed(
         title="You now own this account",
         description=(
-            f"Linked **{_linked_name(result)}** — and because you proved ownership "
+            f"Linked **{_linked_name(result)}**. And because you proved ownership "
             "by logging in, you're now its owner.\n\n"
             f"{others} had linked it by friend code without proving it. Keep their "
-            "access, or remove it? **No response keeps it.**"
+            "access, or remove it?"
         ),
         color=_COLOR_OK,
     )
@@ -256,7 +316,7 @@ def _unregister_confirm_embed(name: str, friend_code: str) -> hikari.Embed:
         description=(
             f"You're linked to **{name}** (`{friend_code}`).\n\n"
             "Unregistering stops score tracking and removes any stored login. "
-            "**Your score history is kept** — relink the same friend code later "
+            "**Your score history is kept**, you can relink the same friend code later "
             "and it comes back. Continue?"
         ),
         color=_COLOR_ERR,
@@ -271,7 +331,7 @@ def _unregistered_embed(
         case Strayed() | LeftShared():
             desc = (
                 f"Unregistered **{name}**. Your link is removed. Your history is "
-                "kept. Relink the same friend code any time to pick it back up."
+                "kept."
             )
         case NotLinked():
             desc = "You don't have an Arcaea account linked."
@@ -281,9 +341,12 @@ def _unregistered_embed(
 class _CodeModal(lightbulb.components.Modal):
     """Collects a friend code and registers it."""
 
-    def __init__(self, svc: RegistrationService, approvals: ApprovalService) -> None:
+    def __init__(
+        self, svc: RegistrationService, approvals: ApprovalService, live: LiveUpdateService
+    ) -> None:
         self._svc = svc
         self._approvals = approvals
+        self._live = live
         self.code = self.add_short_text_input(
             "Friend code",
             placeholder="9 digits, e.g. 123456789",
@@ -292,12 +355,10 @@ class _CodeModal(lightbulb.components.Modal):
         )
 
     async def on_submit(self, ctx: lightbulb.components.ModalContext) -> None:
-        # First line: everything below can outrun the 3s interaction budget.
+
         await ctx.defer(ephemeral=True)
         uid = int(ctx.user.id)
-        # Exception-safe by contract: attach() marks itself done only after this
-        # returns, so an escaping exception would leave the user watching a
-        # timeout rather than seeing an error.
+
         try:
             async with async_session() as db:
                 result = await self._svc.register_by_code(
@@ -314,22 +375,22 @@ class _CodeModal(lightbulb.components.Modal):
                         owner_id=result.owner_id,
                         account=result.account,
                     )
-                    embed = _info_embed(reply)
-                else:
-                    embed = _registered_embed(result)
+                    await ctx.respond(embed=_info_embed(reply), ephemeral=True)
+                    return
         except Exception as exc:
             logger.info("register by code failed for %s: %r", ctx.user.id, exc)
             await _respond_error(ctx, exc)
             return
 
-        await ctx.respond(embed=embed, ephemeral=True)
+        await _send_welcome(ctx, self._live, result.display_name, result.rating)
 
 
 class _AccountModal(lightbulb.components.Modal):
     """Collects a lowiro login and links it."""
 
-    def __init__(self, svc: RegistrationService) -> None:
+    def __init__(self, svc: RegistrationService, live: LiveUpdateService) -> None:
         self._svc = svc
+        self._live = live
         self.email = self.add_short_text_input(
             "Arcaea email", placeholder="the email you log into Arcaea with"
         )
@@ -348,7 +409,8 @@ class _AccountModal(lightbulb.components.Modal):
                     ctx.value_for(self.password) or "",
                 )
         except Exception as exc:
-            logger.info("register by credentials failed for %s: %s", ctx.user.id, type(exc).__name__)
+            logger.info("register by credentials failed for %s: %s",
+                        ctx.user.id, type(exc).__name__)
             await _respond_error(ctx, exc)
             return
 
@@ -357,13 +419,16 @@ class _AccountModal(lightbulb.components.Modal):
             await self._resolve_stale_links(ctx, result)
             return
 
-        await ctx.respond(embed=_account_linked_embed(result), ephemeral=True)
-
         # A second proven login coexisting: tell the existing owner, no gate.
+        # Sent before the welcome reply -- that reply's button wait shouldn't
+        # delay notifying the other owner.
         if isinstance(result, ProvenCoexists):
             await send_dm(
-                ctx.client.app, result.owner_id, embed=_coexist_notice_embed(result.account)
+                ctx.client.app, result.owner_id, embed=_coexist_notice_embed(
+                    result.account)
             )
+
+        await _send_welcome(ctx, self._live, _linked_name(result), _linked_rating(result))
 
     async def _resolve_stale_links(
         self, ctx: lightbulb.components.ModalContext, result: ProvenOverCode
@@ -400,7 +465,8 @@ class _AccountModal(lightbulb.components.Modal):
                 await db.commit()
             for _, discord_id in demoted:
                 await send_dm(
-                    mctx.client.app, discord_id, embed=_link_removed_embed(account)
+                    mctx.client.app, discord_id, embed=_link_removed_embed(
+                        account)
                 )
             await mctx.respond(
                 "Removed their link. Only you are linked to this account now.",
@@ -448,12 +514,13 @@ class Register(
         client: lightbulb.Client,
         svc: RegistrationService,
         approvals: ApprovalService,
+        live: LiveUpdateService,
     ) -> None:
         if self.method == "account":
-            await self._consent_then_modal(ctx, client, svc)
+            await self._consent_then_modal(ctx, client, svc, live)
             return
 
-        modal = _CodeModal(svc, approvals)
+        modal = _CodeModal(svc, approvals, live)
         custom_id = str(uuid.uuid4())
         # A modal must be an interaction's FIRST response; it cannot follow a defer.
         await ctx.respond_with_modal(
@@ -466,39 +533,46 @@ class Register(
         ctx: lightbulb.Context,
         client: lightbulb.Client,
         svc: RegistrationService,
+        live: LiveUpdateService,
     ) -> None:
-        """Explain first, then open the modal from the button's interaction."""
         menu = lightbulb.components.Menu()
-        caller_id = ctx.user.id
+
+        # Restore this on_continue when account linking reopens; swap the
+        # button below back to disabled=False, on_continue.
+        # async def on_continue(mctx: lightbulb.components.MenuContext) -> None:
+        #     if mctx.user.id != ctx.user.id:
+        #         await mctx.respond("This button isn't for you.", ephemeral=True)
+        #         return
+        #     modal = _AccountModal(svc, live)
+        #     custom_id = str(uuid.uuid4())
+        #     await mctx.respond_with_modal(
+        #         "Link your Arcaea account", custom_id, components=modal
+        #     )
+        #     mctx.stop_interacting()
+        #     await self._await_modal(modal, client, custom_id, ctx.user.id)
 
         async def on_continue(mctx: lightbulb.components.MenuContext) -> None:
-            if mctx.user.id != caller_id:
-                await mctx.respond("This button isn't for you.", ephemeral=True)
-                return
-            modal = _AccountModal(svc)
-            custom_id = str(uuid.uuid4())
-            await mctx.respond_with_modal(
-                "Link your Arcaea account", custom_id, components=modal
-            )
-            mctx.stop_interacting()
-            await self._await_modal(modal, client, custom_id, caller_id)
+            raise AssertionError("disabled button cannot be pressed")
 
         menu.add_interactive_button(
-            hikari.ButtonStyle.PRIMARY, on_continue, label="Link my account"
+            hikari.ButtonStyle.PRIMARY,
+            on_continue,
+            label="Link my account",
+            disabled=True,
         )
         await ctx.respond(
             embed=hikari.Embed(
                 title="Linking your Arcaea account",
-                description=_LINK_BENEFITS,
+                description=_LINK_BENEFITS + _TOS_NOTICE + _ACCOUNT_METHOD_BLOCKED,
                 color=_COLOR_INFO,
             ),
             components=menu,
             ephemeral=True,
         )
-        try:
-            await menu.attach(client, timeout=_CONSENT_TIMEOUT)
-        except asyncio.TimeoutError:
-            logger.debug("link consent timed out for %s", caller_id)
+        # try:
+        #     await menu.attach(client, timeout=_CONSENT_TIMEOUT)
+        # except asyncio.TimeoutError:
+        #     logger.debug("link consent timed out for %s", ctx.user.id)
 
     async def _await_modal(
         self,
@@ -524,7 +598,7 @@ class LinkInfo(
         await ctx.respond(
             embed=hikari.Embed(
                 title="Linking your Arcaea account",
-                description=_LINK_BENEFITS,
+                description=_LINK_BENEFITS + _ACCOUNT_METHOD_BLOCKED,
                 color=_COLOR_INFO,
             ),
             ephemeral=True,
@@ -550,7 +624,8 @@ class Unlink(
             "entirely, use `/unregister` instead."
         )
         await ctx.respond(
-            embed=hikari.Embed(title="Unlink", description=message, color=_COLOR_OK),
+            embed=hikari.Embed(
+                title="Unlink", description=message, color=_COLOR_OK),
             ephemeral=True,
         )
 
@@ -610,7 +685,7 @@ class Unregister(
                 await mctx.respond("This button isn't for you.", ephemeral=True)
                 return
             await mctx.respond(
-                "Cancelled. You're still linked.", edit=True, components=[]
+                "Cancelled.", edit=True, components=[]
             )
             mctx.stop_interacting()
 

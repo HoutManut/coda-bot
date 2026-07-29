@@ -1,10 +1,10 @@
 ---
 type: question
-status: open
+status: answered
 blocks: []
 source: arcaea-bot-db-schema.md
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-23
 tags: [question, catalog, schema]
 aliases: ["What is still unresolved in the catalog schema design (`arcaea-bot-db-schema.md` §10)?"]
 ---
@@ -53,4 +53,41 @@ schema ingest's ability to answer from the schema alone.
 
 ## Answer
 
-Not yet answered.
+Queried the live dev DB (`song_difficulties`, 1794 rows) and read
+`src/coda/catalog/seed.py`, `src/coda/admin/routers/entities.py` +
+`presenters.py`, and the `d3f9a1c07b2e` migration directly.
+
+1. **12 of 14 `OVERRIDABLE` fields see real use**: `name_en` (16), `artist`
+   (11), `bpm`/`bpm_base` (6 each), `time` (14), `side` (1), `world_unlock`
+   (7), `bg` (19), `date` (56), `version` (50), `jacket` (65),
+   `jacket_designer` (22). Two never fire in current data: `name_jp` (0) and
+   `remote_download` (0). Schema sizing is validated for 12/14 columns; the
+   remaining two are either genuinely unused-so-far or dead weight — not
+   determinable from data alone, worth asking whoever curates JSON source
+   data whether either ever appears upstream.
+2. **Seeded automatically, not a separate admin operation.** `seed.py::seed()`
+   upserts `Artist`/`Charter` rows straight from `song.artist_ids` /
+   `charter_ids` with `name == id` (see `_named_rows`, called before the
+   `Song` upsert as an FK-ordering requirement). The admin editor only takes
+   over curating names *after* bootstrap seeding — it never does the initial
+   population. **Caveat (confirmed real, not hypothetical):** this is exactly
+   why reseeding is bootstrap-only — a real incident produced duplicate
+   artist/charter rows after ids were renamed via the admin editor's
+   `_rename` (`entities.py:345`, a PK `UPDATE` relying on `ON UPDATE CASCADE`)
+   and the seed was run again, resurrecting the original JSON ids as fresh
+   rows. See [[d-reseed-duplicates-renamed-entities]].
+3. **Never tuned — still exactly the migration's placeholder values.**
+   `d3f9a1c07b2e` is the only migration touching
+   `difficulty_search_config`, and no admin route or template edits it
+   (`grep` for `search_config`/`min_similarity` under `src/coda/admin/` is
+   empty). Live values: all of pst/prs/ftr/byd/etr/byd_2 share
+   `min_similarity=0.4, strong=0.55, hidden_from_broad=false`; `err` is
+   `min_similarity=0.85, strong=0.9, hidden_from_broad=true` with
+   `af_suffixes = {af, err, error, "april fools"}`. Tuning these needs a
+   real search-quality pass, not code archaeology.
+4. **Managed independently — not derived.** `packs.release_date` is a plain
+   admin-editable date field (`entities.py:685`, `pack_detail.html:14`),
+   same treatment as `songs.date`: `presenters.py:139` states explicitly
+   "`packs.release_date` is treated the same way" as a manual midnight-UTC
+   date-picker edit. No derivation-from-earliest-song logic exists anywhere
+   in `src/`.

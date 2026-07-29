@@ -1,24 +1,14 @@
 """Ingest observed plays into ``play_scores``.
 
-The whole design turns on one fact: a play's identity is its WIRE tuple
-``(arcaea_account_id, wire_song_id, wire_difficulty, score, time_played)``, which
-is present and identical on both the friend and the own path (``time_played`` is
-server-assigned, immutable across observations -- ``arcaea-auth-behavior.md``).
-So the same play seen first as a friend score, then -- after the user adds
-credentials -- as an own score, collapses onto one row that gets enriched in
-place. The two paths differ only in what they may write:
+Identity is the wire tuple ``(arcaea_account_id, wire_song_id, wire_difficulty,
+score, time_played)``, shared by friend and own sightings; friend `DO NOTHING`,
+own `DO UPDATE` on detail columns. ``source`` is derived from `play_id is not
+None`. See wiki/modules/scores.md.
 
-    friend sighting -> INSERT the identity, ON CONFLICT DO NOTHING.
-                       Never touches detail columns, so it cannot blank the
-                       richer data an earlier own sighting already stored.
-    own sighting    -> INSERT with detail, ON CONFLICT DO UPDATE the detail.
-                       Fills pure/far/lost, clear_type, modifier, play_id.
-
-``source`` is derived, not passed: only the own path carries a play id, so
-``play_id is not None`` *is* "this came from the own endpoint". Resolution of the
-wire chart to ``song_difficulty_id`` is NOT done here -- the caller sets it on the
-``ScoreResult`` (None until then); an unresolved chart is stored anyway and a
-separate reconcile pass backfills it (``arcaea-score-mapping.md`` §4.3).
+The poller no longer routes a play down both paths (``_friend_scores`` yields
+own-covered players), so a cross-path conflict is now only reachable in the
+window where a player gains or loses own credentials. The conflict handling
+below stays as the backstop for exactly that -- it is not the steady state.
 """
 
 from __future__ import annotations
@@ -54,12 +44,17 @@ class ScoreStore:
 
     async def ingest(
         self, db: AsyncSession, results: Iterable[ScoreResult]
-    ) -> list[ScoreResult]:
-        """UPSERT observed plays; return the ones that were genuinely new.
+    ) -> list[int]:
+        """UPSERT observed plays; return the row ids that were genuinely new.
 
         "New" means a first-time INSERT of that identity -- not an own sighting
         enriching a row a friend sighting already wrote. That subset is what the
-        live-update feed should post; enrichment is silent.
+        live-update feed posts; enrichment is silent.
+
+        Row ids, not ``ScoreResult``s: the poster reads the row back in its own
+        session, since the poller's is short-lived and detaches anything it
+        returns moments later. Ids come out in ``results`` order, so a caller
+        that sorts by ``time_played`` first gets a time-ordered batch for free.
 
         A ``ScoreResult`` whose ``arc_user_id`` maps to no ``ArcaeaAccount`` is
         skipped (we know no such player). So is one whose account has
@@ -74,7 +69,7 @@ class ScoreStore:
 
         accounts = await self._resolve_accounts(db, results)
 
-        new_plays: list[ScoreResult] = []
+        new_play_ids: list[int] = []
         for result in results:
             account = accounts.get(result.arc_user_id)
             if account is None:
@@ -89,9 +84,10 @@ class ScoreStore:
                     account_id,
                 )
                 continue
-            if await self._upsert(db, result, account_id):
-                new_plays.append(result)
-        return new_plays
+            inserted_id = await self._upsert(db, result, account_id)
+            if inserted_id is not None:
+                new_play_ids.append(inserted_id)
+        return new_play_ids
 
     async def _resolve_accounts(
         self, db: AsyncSession, results: list[ScoreResult]
@@ -112,8 +108,8 @@ class ScoreStore:
 
     async def _upsert(
         self, db: AsyncSession, result: ScoreResult, account_id: int
-    ) -> bool:
-        """UPSERT one play. Return True iff it was a first-time INSERT.
+    ) -> int | None:
+        """UPSERT one play. Return its id iff this was a first-time INSERT.
 
         The own path always returns a row (INSERT or UPDATE), so it cannot use
         row-presence to tell them apart; ``xmax = 0`` is Postgres's marker for a
@@ -130,8 +126,7 @@ class ScoreStore:
                 .on_conflict_do_nothing(constraint="uq_play_identity")
                 .returning(PlayScore.id)
             )
-            row = (await db.execute(stmt)).first()
-            return row is not None
+            return (await db.execute(stmt)).scalar_one_or_none()
 
         # Own sighting: enrich detail on conflict, leave the resolved chart FK
         # and observed_at alone (both belong to the first sighting).
@@ -144,10 +139,10 @@ class ScoreStore:
                 }
                 | {"source": stmt.excluded.source},
             )
-            .returning(literal_column("(xmax = 0)").label("inserted"))
+            .returning(PlayScore.id, literal_column("(xmax = 0)").label("inserted"))
         )
-        inserted = (await db.execute(stmt)).scalar_one()
-        return bool(inserted)
+        row_id, inserted = (await db.execute(stmt)).one()
+        return row_id if inserted else None
 
 
 def row_values(result: ScoreResult, account_id: int) -> dict[str, object]:

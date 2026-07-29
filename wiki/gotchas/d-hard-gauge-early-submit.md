@@ -15,7 +15,7 @@ aliases: ["A hard-gauge loss submits early — it's the only sub-song-length sco
 ## Symptom
 
 A polling loop tuned to "at least song-length apart" cadence misses a play; or the recent-30 pool
-(r10 input, see [[Potential]]) wrongly drops a full-length normal/easy-gauge track lost, or
+(r10 input, see [[potential|Potential]]) wrongly drops a full-length normal/easy-gauge track lost, or
 wrongly admits a hard-gauge loss.
 
 ## Cause
@@ -30,7 +30,7 @@ full song duration. Two consequences:
    everything else.
 2. It is the **only** play excluded from the PTT recent-30 pool. The discriminator is
    `clear_type == 0` **AND** `modifier == 2` — both fields are **own-credentials only** (see
-   [[Scoring]]), so a friend-path consumer cannot identify one at all (see
+   [[scoring|Scoring]]), so a friend-path consumer cannot identify one at all (see
    [[d-r10-impossible-friend-path]]).
 
 ## The wrong fix

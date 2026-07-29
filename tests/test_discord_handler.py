@@ -70,5 +70,6 @@ async def test_failed_post_is_swallowed_and_consumer_survives() -> None:
     await asyncio.wait_for(handler._queue.join(), timeout=1.0)
 
     assert app.rest.create_message.await_count == 2  # survived the first failure
+    assert handler._task is not None
     assert not handler._task.done()
     await handler.stop()

@@ -1,7 +1,7 @@
 """Where a user's live score updates go.
 
-Server admins allowlist channels; users choose from that allowlist. The default
-is the user's DM.
+Server admins allowlist channels; users choose from that allowlist. Updates
+start OFF; turning them on defaults to the user's DM unless a channel is chosen.
 
 **Resolution happens at post time, not set time.** A user's stored channel is
 only honoured while it is still allowlisted, so an admin removing a channel drops
@@ -17,13 +17,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coda.db.models import LiveUpdateChannel, LiveUpdatePref
+from coda.scores.filters import ChannelFloor
 
 logger = logging.getLogger(__name__)
 
-# A registration is an opt-in to score tracking, and updates start in the user's
-# DM where only they see them. Flip to False to make updates opt-in instead --
-# nothing else needs to change.
-DEFAULT_ENABLED = True
+# Live updates are opt-in, separate from tracking (always on at registration).
+# Flip to True to make updates opt-out (start in DM) instead -- nothing else
+# needs to change.
+DEFAULT_ENABLED = False
 
 
 class LiveUpdateService:
@@ -89,6 +90,57 @@ class LiveUpdateService:
         logger.info("live: guild %s disallowed channel %s", guild_id, channel_id)
         return True
 
+    async def floor_for(
+        self, db: AsyncSession, channel_id: int
+    ) -> ChannelFloor | None:
+        """The guild's bar for this channel, if it set one.
+
+        A separate read rather than widening ``resolve_destination``'s return:
+        one extra indexed lookup per channel post is nothing at this scale, and
+        the resolver's signature stays what the poller calls. DMs never reach
+        here -- a user's own inbox is not a guild's business.
+        """
+        row = (
+            await db.execute(
+                select(LiveUpdateChannel)
+                .where(LiveUpdateChannel.channel_id == channel_id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return None if row is None else ChannelFloor.of(row)
+
+    async def set_floor(
+        self,
+        db: AsyncSession,
+        guild_id: int,
+        channel_id: int,
+        *,
+        min_level: int | None,
+        min_grade: int | None,
+    ) -> bool:
+        """Set a channel's floor. False if the channel is not on the allowlist."""
+        row = (
+            await db.execute(
+                select(LiveUpdateChannel).where(
+                    LiveUpdateChannel.guild_id == guild_id,
+                    LiveUpdateChannel.channel_id == channel_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        row.min_level = min_level
+        row.min_grade = min_grade
+        await db.commit()
+        logger.info(
+            "live: guild %s floor on channel %s -> level %s, grade %s",
+            guild_id,
+            channel_id,
+            min_level,
+            min_grade,
+        )
+        return True
+
     async def get_pref(self, db: AsyncSession, discord_id: int) -> LiveUpdatePref | None:
         row = await db.execute(
             select(LiveUpdatePref).where(LiveUpdatePref.discord_id == discord_id)
@@ -110,6 +162,25 @@ class LiveUpdateService:
         pref.enabled = enabled
         await db.commit()
         logger.info("live: user %s enabled -> %s", discord_id, enabled)
+
+    async def set_filters(
+        self,
+        db: AsyncSession,
+        discord_id: int,
+        updates: dict[str, bool | int | None],
+    ) -> LiveUpdatePref:
+        """Apply filter changes and return the resulting row.
+
+        ``updates`` holds only the filters the user actually named -- omitting
+        one leaves it alone, and there is no value that means "unchanged", since
+        ``None`` genuinely means "off" for the three numeric filters.
+        """
+        pref = await self._upsert(db, discord_id)
+        for column, value in updates.items():
+            setattr(pref, column, value)
+        await db.commit()
+        logger.info("live: user %s filters -> %s", discord_id, updates)
+        return pref
 
     async def resolve_destination(
         self, db: AsyncSession, discord_id: int

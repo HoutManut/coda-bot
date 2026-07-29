@@ -3,12 +3,12 @@
 {% macro jacket_widget(name, value, default_stem) %}
 <div class="jacket" data-default="{{ default_stem }}">
   <img class="jacket-thumb" alt="jacket preview"
-       {% if value %}src="/jacket-img/{{ value }}.jpg"{% else %}style="display:none"{% endif %}>
+       {% if value %}src="/jacket-img/{{ value }}.webp"{% else %}style="display:none"{% endif %}>
   <div class="jacket-body">
     <label>{{ name }}
       <input name="{{ name }}" class="jacket-input" value="{{ value }}" placeholder="{{ default_stem }}">
     </label>
-    <div class="jacket-drop" tabindex="0">Drop image or click to choose · names it <code>{{ default_stem }}.jpg</code></div>
+    <div class="jacket-drop" tabindex="0">Drop image or click to choose · names it <code>{{ default_stem }}.webp</code></div>
     <input type="file" class="jacket-file" accept="image/*" hidden>
     <div class="jacket-url">
       <input type="url" class="jacket-url-input" placeholder="…or paste image URL">
@@ -19,10 +19,42 @@
 </div>
 {% endmacro %}
 
+{# Difficulty chip: short label on the tint derived from catalog/colors.py.
+   `ord` is the sort key admin.js reads on the charter page; omit elsewhere. #}
+{% macro diff_chip(diff, ord=None) %}
+<span class="diff-chip {{ difficulty_tint_class(diff) }}" style="{{ difficulty_tint_style(diff) }}"
+      {%- if ord is not none %} data-ord="{{ ord }}"{% endif %}>{{ chip_label(diff) }}</span>
+{%- endmacro %}
+
+{# Song release date. Stored as one unix second, edited as a day plus the
+   whole-second offset the game uses to order songs inside a release day. #}
+{% macro date_field(seconds) %}
+{% if seconds and not date_in_range(seconds) %}
+  {# Not a formattable unix second (a value stored in milliseconds does this).
+     Fall back to the raw field so saving cannot silently zero it. #}
+  <label class="date-bad" data-tip="Not a valid unix second — expected seconds, not milliseconds">date (raw)
+    <input name="date" value="{{ seconds }}" data-secdate></label>
+{% else %}
+  {% set day, offset = split_date(seconds) %}
+  <label data-tip="db: {{ seconds }}">date
+    <input type="date" name="date_day" value="{{ day }}"></label>
+  <label data-tip="Whole-second offset within the release day — the game's sort tiebreak">offset
+    <input type="number" name="date_offset" class="fnum" value="{{ offset }}" step="1"></label>
+{% endif %}
+{% endmacro %}
+
 {# Sortable header cell. Re-clicking the active column flips direction. #}
 {% macro sort_th(page, label, key) %}
 <th><a class="sort{{ ' active' if page.sort == key }}" href="{{ page.url(sort=key) }}">{{ label }}{{ page.arrow(key) }}</a></th>
 {% endmacro %}
+
+{# Sortable header for the grid lists, which have no <th> to carry aria-sort. #}
+{% macro sort_link(page, label, key) %}
+<a class="sort{{ ' active' if page.sort == key }}" href="{{ page.url(sort=key) }}"
+   role="columnheader"
+   aria-sort="{{ ('ascending' if page.dir == 'asc' else 'descending') if page.sort == key else 'none' }}"
+   >{{ label }}{{ page.arrow(key) }}</a>
+{%- endmacro %}
 
 {# Page window summary + prev/next. #}
 {% macro pager(page) %}

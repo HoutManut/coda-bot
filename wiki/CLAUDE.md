@@ -48,6 +48,7 @@ wiki/
 - **The code and the live wire are the source of truth.** Wiki pages summarize and cross-reference; when a page disagrees with shipped code or an observed response, the page is wrong and gets `status: stale`.
 - **The private webapi changes without notice.** Any page making a wire claim carries `verified:` (a date) and a confidence grade (see [[auth-and-sessions]]). Undated wire claims are suspect.
 - **Newer decisions reverse older pages by design** — a page contradicting a later entry in `decisions/` is stale, not authoritative. Encode that direction on the page.
+- Manual notes: `Manual Note:` are written by the owner unformatted. Bring them up on related discussion then bake them into the doc aferwards.
 
 ## Operations
 

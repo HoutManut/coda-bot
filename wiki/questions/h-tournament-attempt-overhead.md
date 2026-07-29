@@ -13,7 +13,7 @@ aliases: ["How long is song-select → load → results, really — and does `2t
 
 ## Why it is open
 
-The tournament window formula `clamp(2t, 100s, 5m)` ([[Tournaments]] §3)
+The tournament window formula `clamp(2t, 100s, 5m)` ([[tournaments|Tournaments]] §3)
 assumes an "overhead" figure (song select, load, results screen) of
 20–40s, used only as a rough estimate: `attempts ≈ floor(D / (t + overhead))`.
 At `t=120, D=240, o=30` that floors to exactly 1 attempt; the real overhead

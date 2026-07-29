@@ -16,11 +16,16 @@ class Scope(str, enum.Enum):
 class ConfigKey:
     name: str
     default: Any
-    # tuple of strings = enum; "str"/"bool"/"int" = freeform primitive
-    type: Literal["str", "bool", "int"] | tuple[str, ...]
+    # tuple of strings = enum; the rest are freeform primitives validated by
+    # coda.settings.parse -- "timezone" is a str that must name an IANA zone.
+    type: Literal["str", "bool", "int", "timezone"] | tuple[str, ...]
     guild_chain: tuple[Scope, ...]
     dm_chain: tuple[Scope, ...]
     description: str = field(default="")
+    # Who may see the key exists. Visibility only -- settable_scopes still
+    # decides where it can be written. Defaults to "user": forgetting to think
+    # about it leaves a noisy picker, never a silent gate.
+    audience: Literal["user", "owner"] = "user"
 
     @property
     def settable_scopes(self) -> set[Scope]:

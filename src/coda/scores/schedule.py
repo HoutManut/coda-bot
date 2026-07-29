@@ -92,13 +92,8 @@ class PollSchedule:
     def _spread(self, key: PollKey, proposal: float) -> float:
         """Nudge one key's proposed due time toward the middle of its own gap.
 
-        Neighbours are compared by PHASE (offset modulo the interval), not by
-        absolute due time. Every key polls once per interval, so a neighbour's
-        due time repeats; measured absolutely, a proposal a full interval out is
-        almost always later than everyone else's pending due time and the
-        correction only ever pushes it further out -- a one-directional bias that
-        walks every key's period past ``POLL_INTERVAL``, which is the bug this
-        module exists to fix.
+        Neighbours compared by PHASE (offset modulo the interval), not absolute
+        due time -- see wiki/gotchas/d-poll-schedule-absolute-vs-phase.md.
         """
         offsets = [
             (due - proposal) % self._interval

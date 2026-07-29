@@ -14,9 +14,11 @@ dependencies = [
     "colorlog>=6.10.1",
     "cryptography>=49.0.0",
     "fastapi>=0.136.3",
+    "fonttools>=4.63.0",
     "hikari>=2.5.0",
     "hikari-lightbulb>=3",
     "jinja2>=3.1.6",
+    "pillow>=12.3.0",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.29",
     "sqlalchemy[asyncio]>=2.0",
@@ -39,6 +41,7 @@ packages = ["src/coda"]
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.411",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
 ]

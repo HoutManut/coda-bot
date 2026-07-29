@@ -46,7 +46,7 @@ registration UX, `max_friend` in practice).
 - Task 14 (credential registration UX) built as an ephemeral modal, not a DM-only or
   out-of-band form.
 - Task 15 (`max_friend` in practice) answered 10 on a fresh account, ladder to 25 — feeds
-  the pool sizing claim in [[Auth & Sessions]].
+  the pool sizing claim in [[auth-and-sessions|Auth & Sessions]].
 
 ## Contradicts / reversed by
 

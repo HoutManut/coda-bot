@@ -27,7 +27,7 @@ Companion to `arcaea-scoring.md` (score) and `arcaea-domain-reference.md` (CC).
 
 - Play rating: `score>=10M → cc+2`; `9.8M<=score<10M → cc+1+(score-9.8M)/200_000`;
   `score<9.8M → cc+(score-9.5M)/300_000`; floored at 0. **Verified against the old project's
-  `coda/utils/utils.py`**, current as of 2026-07-17. See [[Potential]].
+  `coda/utils/utils.py`**, current as of 2026-07-17. See [[potential|Potential]].
 - An unknown CC (`rating<=0`) yields **no computable play rating** — not 0. See
   [[d-unknown-cc-no-play-rating]].
 - PTT = `(sum(best_30) + sum(recent_10)) / 40`. Neither pool holds two entries for the same
@@ -55,7 +55,7 @@ Companion to `arcaea-scoring.md` (score) and `arcaea-domain-reference.md` (CC).
   constants are accurate, full stop. "CC is not the limiter" for the planned 5-significant-digit
   PTT display. Per the project's standing memory (`catalog CC is fact`), any earlier hedge about
   CC precision is stale — this source's own current text already states the corrected position,
-  so there is nothing left to override on the page derived from it. See [[Potential]] §Traps.
+  so there is nothing left to override on the page derived from it. See [[potential|Potential]] §Traps.
 
 ## Contradicts / reversed by
 
@@ -68,5 +68,5 @@ but the shared name is a real cross-source trap. See [[d-ptt-hidden-sentinel]].
 
 ## Feeds
 
-[[Potential]], [[d-ptt-hidden-sentinel]], [[d-unknown-cc-no-play-rating]],
+[[potential|Potential]], [[d-ptt-hidden-sentinel]], [[d-unknown-cc-no-play-rating]],
 [[d-r10-impossible-friend-path]], [[d-hard-gauge-early-submit]]

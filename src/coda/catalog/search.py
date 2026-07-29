@@ -4,21 +4,26 @@
 (plain ids, never a Discord embed) so future callers (``/score``, tournament
 chart-pick, alias admin) share one resolver. Presentation lives in the caller.
 
-The query grammar (level / CC / exact id / ``<song> <class>`` chart intent /
-name+alias) is defined here; this module is its single source of truth. Candidate generation hits the
-``search_index`` materialized view (pg_trgm exact + fuzzy); confidence banding
-and conflict resolution happen here in Python.
+The positional grammar (level / CC / exact id / ``<song> <class>`` chart intent /
+name+alias) is defined here. The ``key:value`` filter grammar is parsed in
+:mod:`coda.catalog.query` and turned into SQL by :mod:`coda.catalog.filters`; a
+query carrying filters is a browse and always yields a chart list. Candidate
+generation hits the ``search_index`` materialized view (pg_trgm exact + fuzzy);
+confidence banding and conflict resolution happen here in Python.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Union
 
-from sqlalchemy import select, text
+from sqlalchemy import and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from coda.catalog.filters import chart_predicate, escape_like
+from coda.catalog.query import FieldFilter, ParsedQuery, parse
 from coda.db.enums import DifficultyClass
 from coda.db.models import DifficultySearchConfig, Song, SongDifficulty
 from coda.utils.encoding import encode_level, encode_rating
@@ -95,7 +100,6 @@ Resolution = Union[
 
 _LEVEL_RE = re.compile(r"^\d{1,2}\+?$")
 _CC_RE = re.compile(r"^\d{1,2}\.\d+$")
-_WS_RE = re.compile(r"\s+")
 
 _CLASS_TOKENS: dict[str, DifficultyClass] = {
     "pst": DifficultyClass.PST,
@@ -113,16 +117,7 @@ _CLASS_TOKENS: dict[str, DifficultyClass] = {
 _LIST_CAP = 200
 
 
-def _normalize(query: str) -> str:
-    return _WS_RE.sub(" ", query.strip()).lower()
-
-
-def _escape_like(term: str) -> str:
-    """Escape LIKE wildcards so a typed ``%`` or ``_`` is matched literally."""
-    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _is_delisted(song: Song) -> bool:
+def is_delisted(song: Song) -> bool:
     name = song.name_en
     return len(name) >= 2 and name.startswith("_") and name.endswith("_")
 
@@ -163,7 +158,15 @@ class SearchService:
         """Resolve a raw query to a typed result. ``include_hidden`` unlocks err
         charts (via explicit intent only) and delisted songs; ``/song`` passes
         the default, keeping both cloaked."""
-        norm = _normalize(query)
+        parsed = parse(query)
+        if parsed.error is not None:
+            return NoMatch(reason=parsed.error)
+        if parsed.filters:
+            return await self._resolve_filtered(
+                db, parsed, difficulty, include_hidden
+            )
+
+        norm = parsed.text
         if not norm:
             return NoMatch()
 
@@ -182,36 +185,95 @@ class SearchService:
         return await self._resolve_name(db, norm, config, difficulty, include_hidden)
 
     async def candidate_songs(
-        self, db: AsyncSession, typed: str, *, limit: int = 25
+        self,
+        db: AsyncSession,
+        typed: str,
+        *,
+        limit: int = 25,
+        classes: Sequence[DifficultyClass] | None = None,
     ) -> list[tuple[str, str, str, str]]:
         """Autocomplete fast path: up to ``limit`` (song_id, name_en, artist,
-        pack_name) rows, err/delisted excluded. Substring match (not the
-        similarity gate) so a short prefix like ``prag`` still finds
-        ``pragmatism``; ranked by trigram similarity within the matches."""
-        norm = _normalize(typed)
-        if not norm:
+        pack_name) rows, err/delisted excluded. Bare text is a substring match
+        (not the similarity gate) so a short prefix like ``prag`` still finds
+        ``pragmatism``; ranked by trigram similarity within the matches.
+
+        ``classes`` restricts to songs owning a chart in those difficulties, and
+        scopes every chart-level filter to the same charts — so on a Future board
+        ``level>10`` reads the song's Future chart, not its Beyond one.
+        """
+        parsed = parse(typed)
+        if parsed.error is not None:
             return []
-        like = f"%{_escape_like(norm)}%"
+        ordered = await self._autocomplete_order(db, parsed, classes)
+        if not ordered:
+            return []
+        return await self._listed_song_rows(db, ordered, limit)
+
+    async def _autocomplete_order(
+        self,
+        db: AsyncSession,
+        parsed: ParsedQuery,
+        classes: Sequence[DifficultyClass] | None,
+    ) -> list[str]:
+        """Song ids in the order they should be offered."""
+        ranked = await self._substring_ranked(db, parsed.text) if parsed.text else None
+        if not parsed.filters and classes is None:
+            return ranked or []
+        allowed = await self._charted_song_ids(db, parsed.filters, classes)
+        if ranked is None:
+            return allowed
+        keep = set(allowed)
+        return [song_id for song_id in ranked if song_id in keep]
+
+    async def _substring_ranked(self, db: AsyncSession, norm: str) -> list[str]:
         rows = (
-            await db.execute(_AUTOCOMPLETE_SQL, {"q": norm, "like": like})
+            await db.execute(
+                _AUTOCOMPLETE_SQL, {"q": norm, "like": f"%{escape_like(norm)}%"}
+            )
         ).all()
         best: dict[str, float] = {}
         for row in rows:
             best[row.song_id] = max(best.get(row.song_id, 0.0), float(row.sim))
-        ordered = sorted(best, key=lambda sid: best[sid], reverse=True)
-        if not ordered:
-            return []
+        return sorted(best, key=lambda song_id: best[song_id], reverse=True)
+
+    async def _charted_song_ids(
+        self,
+        db: AsyncSession,
+        filters: Sequence[FieldFilter],
+        classes: Sequence[DifficultyClass] | None,
+    ) -> list[str]:
+        """Songs owning a chart that satisfies every filter, in name order."""
+        scope = (
+            SongDifficulty.difficulty.in_(classes)
+            if classes is not None
+            else SongDifficulty.difficulty != DifficultyClass.ERR
+        )
+        stmt = (
+            select(Song.song_id, Song.name_en)
+            .join(SongDifficulty, SongDifficulty.song_id == Song.song_id)
+            .where(await chart_predicate(db, filters), scope)
+            .distinct()
+            .order_by(Song.name_en)
+        )
+        rows = (await db.execute(stmt)).all()
+        return [song_id for song_id, _ in rows]
+
+    async def _listed_song_rows(
+        self, db: AsyncSession, ordered: list[str], limit: int
+    ) -> list[tuple[str, str, str, str]]:
         stmt = select(
             Song.song_id, Song.name_en, Song.artist, Song.pack_name
         ).where(Song.song_id.in_(ordered))
         rows = (await db.execute(stmt)).all()
-        rank = {sid: i for i, sid in enumerate(ordered)}
+        rank = {song_id: i for i, song_id in enumerate(ordered)}
         visible = [
-            (r[0], r[1], r[2], r[3])
-            for r in rows
-            if not (len(r[1]) >= 2 and r[1].startswith("_") and r[1].endswith("_"))
+            (row[0], row[1], row[2], row[3])
+            for row in rows
+            if not (
+                len(row[1]) >= 2 and row[1].startswith("_") and row[1].endswith("_")
+            )
         ]
-        visible.sort(key=lambda r: rank[r[0]])
+        visible.sort(key=lambda row: rank[row[0]])
         return visible[:limit]
 
     # -- config ----------------------------------------------------------
@@ -226,6 +288,39 @@ class SearchService:
         err = by_class.get(DifficultyClass.ERR)
         suffixes = tuple(err.af_suffixes) if err and err.af_suffixes else ()
         return _Config(by_class, broad_floor, strong, hidden, suffixes)
+
+    # -- field filters ---------------------------------------------------
+
+    async def _resolve_filtered(
+        self,
+        db: AsyncSession,
+        parsed: ParsedQuery,
+        difficulty: DifficultyClass | None,
+        include_hidden: bool,
+    ) -> Resolution:
+        """A query carrying ``key:value`` filters is a browse, not a name lookup:
+        it always yields the chart list, never a 'did you mean'."""
+        predicate = await chart_predicate(db, parsed.filters)
+        if parsed.text:
+            song_ids = await self._name_song_ids(db, parsed.text, include_hidden)
+            if not song_ids:
+                return NoMatch()
+            predicate = and_(predicate, SongDifficulty.song_id.in_(song_ids))
+        charts = await self._charts_where(db, predicate, difficulty, include_hidden)
+        return self._collapse_list(charts, "No charts match those filters.")
+
+    async def _name_song_ids(
+        self, db: AsyncSession, norm: str, include_hidden: bool
+    ) -> list[str]:
+        """Every song the bare-text part could mean — filters do the narrowing,
+        so this stays deliberately wide."""
+        config = await self._load_config(db)
+        if len(norm) <= 2:
+            cands = await self._exact_candidates(db, norm)
+        else:
+            cands = await self._fuzzy_candidates(db, norm, config.broad_floor)
+        cands = await self._filter_candidates(db, cands, config, include_hidden)
+        return list(dict.fromkeys(cand.song_id for cand in cands))
 
     # -- level / CC ------------------------------------------------------
 
@@ -281,7 +376,7 @@ class SearchService:
     ) -> bool:
         if chart.difficulty == DifficultyClass.ERR and not include_hidden:
             return False
-        if _is_delisted(song) and not include_hidden:
+        if is_delisted(song) and not include_hidden:
             return False
         if difficulty is not None and chart.difficulty != difficulty:
             return False
@@ -305,7 +400,7 @@ class SearchService:
         song = await db.get(Song, song_id)
         if song is None:
             return None
-        if _is_delisted(song) and not include_hidden:
+        if is_delisted(song) and not include_hidden:
             return None
         return song
 

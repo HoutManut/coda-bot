@@ -21,6 +21,13 @@ from coda.db.models.artist import (
     SongArtist,
 )
 from coda.db.models.bot_account import BotAccount
+from coda.db.models.chardle import (
+    ChardleChannel,
+    ChardleGuess,
+    ChardlePlayerThread,
+    ChardlePuzzle,
+    ChardleSession,
+)
 from coda.db.models.charter import Charter, DifficultyCharter, SongCharter
 from coda.db.models.difficulty import SongDifficulty
 from coda.db.models.live_update import LiveUpdateChannel, LiveUpdatePref
@@ -59,4 +66,9 @@ __all__ = [
     "PlayScore",
     "PendingRequest",
     "DifficultySearchConfig",
+    "ChardlePuzzle",
+    "ChardleSession",
+    "ChardleGuess",
+    "ChardleChannel",
+    "ChardlePlayerThread",
 ]

@@ -70,5 +70,5 @@ rating is NOT stored... same rule as 'tier is derived, never stored'").
 
 ## Feeds
 
-`[[db]]` (this ingest's primary derived page). §9's remaining open items feed
-`[[h-catalog-schema-open-questions]]`.
+[[db]] (this ingest's primary derived page). §9's remaining open items feed
+[[h-catalog-schema-open-questions]].

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import sort_th, pager %}
+{% from "_macros.html" import sort_link, pager, diff_chip %}
 {% block title %}Songs{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -7,32 +7,189 @@
   <a class="btn" href="/songs/new">+ New song</a>
 </div>
 
-<input
-  type="search" name="q" value="{{ page.q }}" placeholder="Search by name, id, or alias…"
-  hx-get="/songs" hx-trigger="input changed delay:200ms, search"
-  hx-target="#results" hx-select="#results" hx-swap="outerHTML"
-  hx-push-url="true" autofocus>
+{# Search and every filter live in ONE form so htmx sends the complete state on
+   any change — the search input alone would post only `q` and silently drop
+   the filters on the next keystroke. `onsubmit=return false` stops Enter from
+   firing a native GET that would bypass htmx entirely.
+
+   Only the search input sits outside #results, so it keeps focus and caret
+   across a swap. Everything whose state must track the response — the mode
+   toggle, the filter controls, the active-filter chips, the auto-switch notice
+   — is INSIDE it, or an htmx request would leave the view saying one thing
+   while the rows below it say another. #}
+{# hx-disinherit is load-bearing: hx-target/select/swap are inherited, and the
+   row links live inside this form. Without it a boosted row click fetches the
+   song page, finds no #results in it, and swaps emptiness into #results —
+   a blank screen until you refresh. The form's own request is unaffected;
+   children fall back to body-level hx-boost. #}
+<form id="controls" onsubmit="return false"
+      hx-get="/songs" hx-target="#results" hx-select="#results" hx-swap="outerHTML"
+      hx-push-url="true" hx-trigger="change"
+      hx-disinherit="hx-target hx-select hx-swap hx-push-url">
+  <input
+    type="search" name="q" value="{{ page.q }}"
+    placeholder="{{ 'Search charts by name, id, or alias…' if mode == 'charts' else 'Search by name, id, or alias…' }}"
+    hx-get="/songs" hx-trigger="input changed delay:200ms, search"
+    hx-target="#results" hx-select="#results" hx-swap="outerHTML"
+    hx-include="#controls" hx-push-url="true" autofocus>
 
 <div id="results">
+  <input type="hidden" name="mode" value="{{ mode }}" data-mode>
+  <div class="head-tools">
+    <div class="segmented" role="group" aria-label="List mode">
+      <a href="/songs?{{ filters.query('songs', page.q) }}"
+         class="{{ 'active' if mode == 'songs' }}"
+         aria-current="{{ 'true' if mode == 'songs' else 'false' }}">Songs</a>
+      <a href="/songs?{{ filters.query('charts', page.q) }}"
+         class="{{ 'active' if mode == 'charts' }}"
+         aria-current="{{ 'true' if mode == 'charts' else 'false' }}">Charts</a>
+    </div>
+  </div>
+
+  {# Always visible, never a disclosure: hidden filter state is how an operator
+     ends up confused about why a query returns nothing. #}
+  <div class="filterbar">
+    <div class="fgroup">
+      <span class="flabel">Difficulty</span>
+      <div class="fpills">
+        {% for d in DIFFICULTY_ORDER %}
+        <label class="fpill {{ difficulty_tint_class(d) }}" style="{{ difficulty_tint_style(d) }}">
+          <input type="checkbox" name="diff" value="{{ d.value }}"
+                 {{ 'checked' if d in filters.difficulties }}>
+          <span>{{ chip_label(d) }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="fgroup">
+      <span class="flabel">Level</span>
+      <input class="fnum" name="lvl_min" value="{{ filters.raw.get('lvl_min', '') }}" placeholder="min">
+      <span class="fdash">–</span>
+      <input class="fnum" name="lvl_max" value="{{ filters.raw.get('lvl_max', '') }}" placeholder="max">
+    </div>
+    <div class="fgroup">
+      <span class="flabel">CC</span>
+      <input class="fnum" name="cc_min" value="{{ filters.raw.get('cc_min', '') }}" placeholder="min">
+      <span class="fdash">–</span>
+      <input class="fnum" name="cc_max" value="{{ filters.raw.get('cc_max', '') }}" placeholder="max">
+    </div>
+    <div class="fgroup">
+      <span class="flabel">Notes</span>
+      <input class="fnum" name="note_min" value="{{ filters.raw.get('note_min', '') }}" placeholder="min">
+      <span class="fdash">–</span>
+      <input class="fnum" name="note_max" value="{{ filters.raw.get('note_max', '') }}" placeholder="max">
+    </div>
+
+    <div class="fgroup">
+      <span class="flabel">Gaps</span>
+      <div class="fpills">
+        {% for value, label in gap_choices %}
+        <label class="fpill fgap">
+          <input type="checkbox" name="gap" value="{{ value }}" {{ 'checked' if value in filters.gaps }}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {% if filters.chips() %}
+  <div class="fchips">
+    {% for chip in filters.chips() %}
+    <span class="fchip">{{ chip.label }}
+      <button type="button" class="link" data-unfilter="{{ chip.param }}"
+              data-value="{{ chip.value }}" title="remove">✕</button></span>
+    {% endfor %}
+    <a class="fclear" href="/songs?mode={{ mode }}{% if page.q %}&q={{ page.q|urlencode }}{% endif %}">clear all</a>
+  </div>
+  {% endif %}
+  {% if switched %}
+  <p class="fnotice">Switched to charts — level, CC, notes and gap filters apply per chart.</p>
+  {% endif %}
+
   {{ pager(page) }}
-  <table>
-    <thead><tr>
-      {{ sort_th(page, '#', 'idx') }}
-      {{ sort_th(page, 'song_id', 'song_id') }}
-      {{ sort_th(page, 'Name', 'name') }}
-      {{ sort_th(page, 'Pack', 'pack') }}
-    </tr></thead>
-    <tbody>
-      {% for song in page.items %}
-      <tr onclick="location='/songs/{{ song.song_id }}'">
-        <td>{{ song.idx }}</td>
-        <td><code>{{ song.song_id }}</code></td>
-        <td>{{ song.name_en }}{% if song.name_jp %} <span class="muted">/ {{ song.name_jp }}</span>{% endif %}</td>
-        <td>{{ song.pack_name }}</td>
-      </tr>
-      {% else %}<tr><td colspan="4" class="muted">No songs match.</td></tr>{% endfor %}
-    </tbody>
-  </table>
+  {% if mode == 'charts' %}
+  <div class="rows charts">
+    <div class="row-head" role="row">
+      {{ sort_link(page, '#', 'idx') }}
+      {{ sort_link(page, 'Chart', 'name') }}
+      {{ sort_link(page, 'Diff', 'difficulty') }}
+      {{ sort_link(page, 'Lv', 'level') }}
+      {{ sort_link(page, 'CC', 'cc') }}
+      {{ sort_link(page, 'Notes', 'note') }}
+    </div>
+    {% for song, chart in page.items %}
+    {# The jacket is the chart's effective one: a BYD chart with its own art
+       must not show the song's cover — that difference is often what is being
+       checked. #}
+    {% set jacket = chart.jacket if chart.jacket is not none else song.jacket %}
+    <a class="row {{ difficulty_tint_class(chart.difficulty) }}"
+       style="{{ difficulty_tint_style(chart.difficulty) }}"
+       href="/songs/{{ song.song_id }}#chart-{{ chart.id }}">
+      <span class="r-idx mono">{{ song.idx }}</span>
+      {% if jacket %}
+      <img class="r-jacket" src="/jacket-img/{{ jacket }}.webp" alt=""
+           width="44" height="44" loading="lazy" decoding="async">
+      {% else %}
+      <span class="r-jacket r-jacket-none" aria-hidden="true"></span>
+      {% endif %}
+      <span class="r-name">{{ chart.name_en or song.name_en }}</span>
+      <code class="r-id">{{ song.song_id }}</code>
+      <span class="r-line2">
+        <span class="r-meta">
+          {{ diff_chip(chart.difficulty) }}
+          <span class="r-lv{{ ' sentinel' if is_sentinel(chart.level) }}">Lv {{ list_level(chart.level) }}</span>
+          <span class="r-sep">·</span>
+          <span class="r-cc{{ ' sentinel' if is_sentinel(chart.rating) }}">CC {{ list_rating(chart.rating) }}</span>
+          <span class="r-sep">·</span>
+          <span class="r-note{{ ' sentinel' if chart.note == 0 }}">{{ "{:,}".format(chart.note) }} notes</span>
+        </span>
+      </span>
+    </a>
+    {% else %}<p class="muted empty">No charts match.</p>{% endfor %}
+  </div>
+  {% else %}
+  <div class="rows songs">
+    <div class="row-head" role="row">
+      {{ sort_link(page, '#', 'idx') }}
+      {{ sort_link(page, 'Song', 'name') }}
+      {{ sort_link(page, 'id', 'song_id') }}
+      {{ sort_link(page, 'Pack', 'pack') }}
+    </div>
+    {% for song in page.items %}
+    {# The row is a real link, not a click handler: middle-click, ctrl-click,
+       tabbing and screen readers all depend on it being an <a>. #}
+    <a class="row {{ side_tint_class(song.side) }}" style="{{ side_tint_style(song.side) }}"
+       href="/songs/{{ song.song_id }}">
+      <span class="r-idx mono">{{ song.idx }}</span>
+      {% if song.jacket %}
+      <img class="r-jacket" src="/jacket-img/{{ song.jacket }}.webp" alt=""
+           width="44" height="44" loading="lazy" decoding="async">
+      {% else %}
+      <span class="r-jacket r-jacket-none" aria-hidden="true"></span>
+      {% endif %}
+      <span class="r-name">{{ song.name_en }}{% if song.name_jp %} <span class="muted">/ {{ song.name_jp }}</span>{% endif %}</span>
+      <code class="r-id">{{ song.song_id }}</code>
+      <span class="r-line2">
+        <span class="r-meta">
+          <span class="r-pack" title="{{ song.pack_name }}">{{ song.pack_name }}</span>
+          <span class="r-sep">·</span><span class="r-version">{{ song.version }}</span>
+          <span class="r-sep">·</span>
+          {% set day, offset = split_date(song.date) %}
+          <span class="r-date">{{ day }}{% if offset %}<span class="r-offset">+{{ offset }}</span>{% else %}<span class="r-offset">+0</span>{% endif %}</span>
+        </span>
+        <span class="r-strip">
+          {% for chart in strips.get(song.song_id, []) %}
+          {{ diff_chip(chart.difficulty) }}<span class="r-lv{{ ' sentinel' if is_sentinel(chart.level) }}">{{ list_level(chart.level) }}</span>
+          {% endfor %}
+        </span>
+      </span>
+    </a>
+    {% else %}<p class="muted empty">No songs match.</p>{% endfor %}
+  </div>
+  {% endif %}
   {{ pager(page) }}
 </div>
+</form>
 {% endblock %}

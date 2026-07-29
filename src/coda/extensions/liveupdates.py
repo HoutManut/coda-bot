@@ -21,9 +21,13 @@ import logging
 import hikari
 import lightbulb
 
+from coda.db.models import LiveUpdatePref
 from coda.db.session import async_session
 from coda.players.live import LiveUpdateService
+from coda.scores.filters import ChannelFloor
+from coda.utils.encoding import decode_level, encode_level
 from coda.utils.permissions import can_send_in
+from coda.utils.scoring import Grade
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,60 @@ _COLOR_ERR = 0xED4245
 
 _DM_CHOICE = "dm"
 _MAX_CHOICES = 25  # Discord's hard cap on autocomplete results.
+
+_OFF_CHOICE = "off"
+
+# The bot sees only the LATEST play per account per poll, so no filter can be
+# described as complete. Every surface that lists filters carries this.
+_SAMPLING_CAVEAT = (
+    "-# I check every few minutes and only ever see your latest play, so some "
+    "plays are never seen."
+)
+
+# Only the grades worth a milestone. Lower ones fire on almost every play.
+_D_GRADE_CHOICE = lightbulb.Choice(name="D", value="D")
+_GRADE_CHOICES = [
+    lightbulb.Choice(name="off", value=_OFF_CHOICE),
+    _D_GRADE_CHOICE,
+    lightbulb.Choice(name="C", value="C"),
+    lightbulb.Choice(name="B", value="B"),
+    lightbulb.Choice(name="A", value="A"),
+    lightbulb.Choice(name="AA", value="AA"),
+    lightbulb.Choice(name="EX", value="EX"),
+    lightbulb.Choice(name="EX+", value="EX_PLUS"),
+]
+
+_GRADE_NAMES = {
+    Grade.D: "D",
+    Grade.C: "C",
+    Grade.B: "B",
+    Grade.A: "A",
+    Grade.AA: "AA",
+    Grade.EX: "EX",
+    Grade.EX_PLUS: "EX+"}
+
+_LEVELS = ("8", "8+", "9", "9+", "10", "10+", "11", "11+", "12")
+_LEVEL_CHOICES = [lightbulb.Choice(name="off", value=_OFF_CHOICE)] + [
+    lightbulb.Choice(name=f"{level} and above", value=level) for level in _LEVELS
+]
+
+
+def _parse_grade(value: str) -> int | None:
+    """A grade choice as a stored ``Grade`` ordinal. ``off`` -> None."""
+    return None if value == _OFF_CHOICE else int(Grade[value])
+
+
+def _parse_level(value: str) -> int | None:
+    """A level choice as a stored ENCODED level. ``off`` -> None."""
+    return None if value == _OFF_CHOICE else encode_level(value)
+
+
+def _grade_label(ordinal: int | None) -> str:
+    return "off" if ordinal is None else _GRADE_NAMES.get(Grade(ordinal), "off")
+
+
+def _level_label(encoded: int | None) -> str:
+    return "off" if encoded is None else f"{decode_level(encoded)} and above"
 
 
 def _embed(title: str, description: str, *, ok: bool = True) -> hikari.Embed:
@@ -66,6 +124,30 @@ async def _ac_channel(ctx: lightbulb.AutocompleteContext[str]) -> None:
     typed = str(ctx.focused.value or "").lower()
     matches = [c for c in choices if typed in c[0].lower()]
     await ctx.respond(matches[:_MAX_CHOICES])
+
+
+async def _ac_allowed(ctx: lightbulb.AutocompleteContext[str]) -> None:
+    """This guild's allowlisted channels. No DM entry -- a floor is guild-only."""
+    guild_id = ctx.interaction.guild_id
+    if guild_id is None:
+        await ctx.respond([])
+        return
+    async with async_session() as db:
+        allowed = await LiveUpdateService().allowed_channels(db, int(guild_id))
+
+    app = ctx.client.app
+    choices: list[tuple[str, str]] = []
+    for channel_id in allowed:
+        channel = (
+            app.cache.get_guild_channel(channel_id)
+            if isinstance(app, hikari.CacheAware)
+            else None
+        )
+        name = f"#{channel.name}" if channel is not None else f"#{channel_id}"
+        choices.append((name, str(channel_id)))
+
+    typed = str(ctx.focused.value or "").lower()
+    await ctx.respond([c for c in choices if typed in c[0].lower()][:_MAX_CHOICES])
 
 
 def _is_admin(ctx: lightbulb.Context) -> bool:
@@ -184,7 +266,8 @@ class Channel(
             async with async_session() as db:
                 await svc.set_destination(db, int(ctx.user.id), None)
             await ctx.respond(
-                _embed("Updates moved", "Your live updates will arrive in your **DMs**."),
+                _embed("Updates moved",
+                       "Your live updates will arrive in your **DMs**."),
                 ephemeral=True,
             )
             return
@@ -226,7 +309,8 @@ class Channel(
             await svc.set_destination(db, int(ctx.user.id), channel_id)
 
         await ctx.respond(
-            _embed("Updates moved", f"Your live updates will now post in <#{channel_id}>."),
+            _embed("Updates moved",
+                   f"Your live updates will now post in <#{channel_id}>."),
             ephemeral=True,
         )
 
@@ -242,7 +326,8 @@ class Channel(
             return False
         app = ctx.client.app
         if not isinstance(app, hikari.CacheAware):
-            return True  # Can't check without a cache; posting re-checks anyway.
+            # Can't check without a cache; posting re-checks anyway.
+            return True
         return can_send_in(app, channel_id, ctx.member) is not False
 
 
@@ -284,6 +369,236 @@ class On(
 
 @loader.command
 @live_group.register
+class Filters(
+    lightbulb.SlashCommand,
+    name="filters",
+    description="Choose which of your plays get posted",
+):
+
+    pb = lightbulb.boolean(
+        "pb", "Personal bests", default=hikari.UNDEFINED
+    )
+    pm = lightbulb.boolean(
+        "pm", "Pure Memory", default=hikari.UNDEFINED
+    )
+    # Said here rather than discovered as silence: the friend payload has no
+    # lost_count, so this can never fire without an own login.
+    fr = lightbulb.boolean(
+        "fr", "Full Recall (needs an own-login account)", default=hikari.UNDEFINED
+    )
+    grade_up = lightbulb.string(
+        "grade_up",
+        "First time you reach this grade on a chart",
+        default=_OFF_CHOICE,
+        choices=_GRADE_CHOICES,
+    )
+    best_of = lightbulb.integer(
+        "best_of",
+        "Plays that land in your top X. 0 turns it off",
+        default=0,
+        min_value=0,
+        max_value=100,
+    )
+    min_level = lightbulb.string(
+        "min_level",
+        "Only charts at this level or higher",
+        default=_OFF_CHOICE,
+        choices=_LEVEL_CHOICES,
+    )
+    all = lightbulb.boolean(
+        "all", "Every play", default=False
+    )
+
+    @lightbulb.invoke
+    async def invoke(self, ctx: lightbulb.Context, svc: LiveUpdateService) -> None:
+        updates = self._updates()
+        async with async_session() as db:
+            if not updates:
+                pref = await svc.get_pref(db, int(ctx.user.id))
+                await ctx.respond(_filters_embed(pref), ephemeral=True)
+                return
+            pref = await svc.set_filters(db, int(ctx.user.id), updates)
+        await ctx.respond(_filters_embed(pref), ephemeral=True)
+
+    def _updates(self) -> dict[str, bool | int | None]:
+        """Only the filters the user actually named. Omitted stays as it was."""
+        updates: dict[str, bool | int | None] = {}
+        for option, column in (
+            (self.all, "post_all"),
+            (self.pb, "post_pb"),
+            (self.pm, "post_pm"),
+            (self.fr, "post_fr"),
+        ):
+            if option is not hikari.UNDEFINED:
+                updates[column] = option
+        if self.grade_up is not hikari.UNDEFINED:
+            updates["min_grade"] = _parse_grade(self.grade_up)
+        if self.best_of is not hikari.UNDEFINED:
+            updates["best_of"] = self.best_of or None
+        if self.min_level is not hikari.UNDEFINED:
+            updates["min_level"] = _parse_level(self.min_level)
+        return updates
+
+
+def _filters_embed(pref: LiveUpdatePref | None) -> hikari.Embed:
+    """What is currently being posted, and what is gating it."""
+    if pref is None:
+        triggers = ["Your personal best"]
+        gates: list[str] = []
+    else:
+        triggers = _trigger_lines(pref)
+        gates = _gate_lines(pref)
+
+    body = "**Posting**\n" + (
+        "\n".join(f"- {line}" for line in triggers)
+        if triggers
+        else "- Nothing. Turn something on and I'll post it."
+    )
+    if gates:
+        body += "\n\n**Only when**\n" + \
+            "\n".join(f"- {line}" for line in gates)
+    # body += f"\n\n{_SAMPLING_CAVEAT}"
+    return _embed("Live update filters", body)
+
+
+def _trigger_lines(pref: LiveUpdatePref) -> list[str]:
+    lines: list[str] = []
+    if pref.post_all:
+        lines.append("Every play I see")
+    if pref.post_pb:
+        lines.append("Your personal best")
+    if pref.post_pm:
+        lines.append("Pure Memory")
+    if pref.post_fr:
+        lines.append("Full Recall (own-login accounts only)")
+    if pref.min_grade is not None:
+        lines.append(
+            f"First time reaching **{_grade_label(pref.min_grade)}** or better on a chart"
+        )
+    if pref.best_of:
+        lines.append(f"Plays landing in your top **{pref.best_of}**")
+    return lines
+
+
+def _gate_lines(pref: LiveUpdatePref) -> list[str]:
+    return (
+        []
+        if pref.min_level is None
+        else [f"The chart is level **{_level_label(pref.min_level)}**"]
+    )
+
+
+def _status_triggers(pref: LiveUpdatePref | None) -> list[str]:
+    return ["Your personal best"] if pref is None else _trigger_lines(pref)
+
+
+def _status_gates(
+    pref: LiveUpdatePref | None, floor: ChannelFloor | None, channel_id: int | None
+) -> list[str]:
+    """The user's own gates, plus whichever the destination channel adds.
+
+    A guild floor is shown, never silent: a bar someone else set must always be
+    explicable, or an absent post looks like a bug.
+    """
+    gates = [] if pref is None else _gate_lines(pref)
+    if floor is None:
+        return gates
+    if floor.min_level is not None:
+        gates.append(
+            f"The chart is level **{decode_level(floor.min_level)} and above** "
+            f"-- <#{channel_id}>'s rule"
+        )
+    if floor.min_grade is not None:
+        gates.append(
+            f"The play is **{_grade_label(int(floor.min_grade))}** or better "
+            f"-- <#{channel_id}>'s rule"
+        )
+    return gates
+
+
+@loader.command
+@live_group.register
+class Floor(
+    lightbulb.SlashCommand,
+    name="floor",
+    description="Raise the bar for live updates in a channel (admin)",
+):
+    channel = lightbulb.string(
+        "channel", "An allowed channel in this server", autocomplete=_ac_allowed
+    )
+    min_level = lightbulb.string(
+        "min_level",
+        "Only charts at this level or higher",
+        default=_OFF_CHOICE,
+        choices=_LEVEL_CHOICES,
+    )
+    min_grade = lightbulb.string(
+        "min_grade",
+        "Only plays at this grade or better",
+        default=_D_GRADE_CHOICE,
+        choices=[_D_GRADE_CHOICE] + _GRADE_CHOICES,
+    )
+
+    @lightbulb.invoke
+    async def invoke(self, ctx: lightbulb.Context, svc: LiveUpdateService) -> None:
+        if ctx.guild_id is None:
+            await ctx.respond(_embed("Not here", "Use this in a server.", ok=False), ephemeral=True)
+            return
+        if not _is_admin(ctx):
+            await ctx.respond(
+                _embed("Nope", "You need **Manage Channels** to do that.", ok=False),
+                ephemeral=True,
+            )
+            return
+        try:
+            channel_id = int(self.channel)
+        except ValueError:
+            await ctx.respond(
+                _embed("Unknown channel", "Pick one from the list.", ok=False),
+                ephemeral=True,
+            )
+            return
+
+        level = _parse_level(self.min_level)
+        grade = _parse_grade(self.min_grade if isinstance(self.min_grade, str) else self.min_grade.value)
+        async with async_session() as db:
+            applied = await svc.set_floor(
+                db,
+                int(ctx.guild_id),
+                channel_id,
+                min_level=level,
+                min_grade=grade,
+            )
+        if not applied:
+            await ctx.respond(
+                _embed(
+                    "Not allowed there",
+                    f"<#{channel_id}> isn't set up for live score updates yet. "
+                    "Allow it with `/liveupdates allow` first.",
+                    ok=False,
+                ),
+                ephemeral=True,
+            )
+            return
+
+        bars: list[str] = []
+        if level is not None:
+            bars.append(f"level **{decode_level(level)}** or higher")
+        if grade is not None:
+            bars.append(f"grade **{_grade_label(grade)}** or better")
+        if not bars:
+            body = f"<#{channel_id}> now takes whatever each member asked for."
+        else:
+            body = (
+                f"<#{channel_id}> now only takes plays on a chart of "
+                + " and at ".join(bars)
+                + "."
+            )
+        await ctx.respond(_embed("Channel floor set", body), ephemeral=True)
+
+
+@loader.command
+@live_group.register
 class Status(
     lightbulb.SlashCommand,
     name="status",
@@ -294,6 +609,7 @@ class Status(
         async with async_session() as db:
             enabled, channel_id = await svc.resolve_destination(db, int(ctx.user.id))
             pref = await svc.get_pref(db, int(ctx.user.id))
+            floor = None if channel_id is None else await svc.floor_for(db, channel_id)
             allowed = (
                 await svc.allowed_channels(db, int(ctx.guild_id))
                 if ctx.guild_id is not None
@@ -311,8 +627,21 @@ class Status(
                     f"\n\nYou'd picked <#{pref.channel_id}>, but it no longer "
                     "allows live updates, so they're going to your DMs instead."
                 )
+            # body += f"\n\n{_SAMPLING_CAVEAT}"
 
         embed = _embed("Live updates", body)
+        if enabled:
+            embed.add_field(
+                name="Posting",
+                value="\n".join(f"- {line}" for line in _status_triggers(pref))
+                or "- Nothing. `/liveupdates filters` turns something on.",
+                inline=False,
+            )
+            gates = _status_gates(pref, floor, channel_id)
+            if gates:
+                embed.add_field(
+                    name="Only when", value="\n".join(f"- {g}" for g in gates), inline=False
+                )
         if allowed:
             embed.add_field(
                 name="Allowed in this server",

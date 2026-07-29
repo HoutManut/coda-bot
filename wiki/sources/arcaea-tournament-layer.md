@@ -54,7 +54,7 @@ contradicted by any handoff in this ingest.
 
 ## Feeds
 
-`[[Tournaments]]`, `[[h-tournament-clock-skew]]`,
-`[[h-tournament-attempt-overhead]]`, `[[h-tournament-scoring-rule-parameter]]`
-(decision), `[[h-no-catalog-inferred-ownership]]` (decision),
-`[[h-ownership-blob-open-before-building]]`
+[[tournaments|Tournaments]], [[h-tournament-clock-skew]],
+[[h-tournament-attempt-overhead]], [[h-tournament-scoring-rule-parameter]]
+(decision), [[h-no-catalog-inferred-ownership]] (decision),
+[[h-ownership-blob-open-before-building]]

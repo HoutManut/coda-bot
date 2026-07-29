@@ -29,7 +29,7 @@ chart is routine rather than exceptional. Companion to `arcaea-scoring.md` and
   `3`=`byd`, `4`=`etr` — `4`=`etr` is **confirmed by capture** (`xterfusion`); the rest are
   domain knowledge, not independently wire-verified in this doc.
 - `byd_2` and `err` have **no wire int** — they are app-defined, not game-native. See
-  [[Score Mapping]].
+  [[score-mapping|Score Mapping]].
 - **Grading (verbatim from source)**: the `byd_2` separate-song-entry structure is
   owner-stated domain knowledge and matches seed data, but **the exact wire payload for a
   `lasteternity` play has not been captured** — the `difficulty: 3` assumption needs
@@ -54,4 +54,4 @@ independently confirms — does not contradict — the difficulty ID table in
 
 ## Feeds
 
-[[Score Mapping]], [[d-byd2-game-song-id-resolution]]
+[[score-mapping|Score Mapping]], [[d-byd2-game-song-id-resolution]]

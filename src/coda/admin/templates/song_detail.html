@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import jacket_widget %}
+{% from "_macros.html" import jacket_widget, date_field %}
 {% block title %}{{ song.name_en }}{% endblock %}
 
 {# Shared entity-link widgets. The datalist is declared once and referenced by
@@ -13,11 +13,21 @@
 {% endmacro %}
 
 {% macro link_form(base, list_id, kind) %}
-<form method="post" action="{{ base }}" class="inline" data-linkform>
+<form method="post" action="{{ base }}" class="inline" data-linkform
+      data-createbase="{{ base }}/create">
   <input name="_pick" list="{{ list_id }}" placeholder="search {{ kind }} (name / alias / id)…"
          autocomplete="off" data-linkpick>
   <input type="hidden" name="id" data-linkid>
   <button>Link</button>
+</form>
+{# Typing a name that matches nothing offers a create. The derived id is shown
+   editable BEFORE the insert: ids are primary keys here, so renaming one later
+   is a cascade — the cheap moment to get it right is now. #}
+<form method="post" class="inline entity-create" data-createform hidden>
+  <label>name <input name="name" data-createname required></label>
+  <label>id <input name="id" data-createid required></label>
+  <button class="small">Create &amp; link</button>
+  <button type="button" class="link" data-createcancel title="cancel">✕</button>
 </form>
 {% endmacro %}
 
@@ -164,8 +174,7 @@
     <label class="check"><input type="checkbox" name="world_unlock" {{ 'checked' if song.world_unlock }}> world_unlock</label>
     <label class="check"><input type="checkbox" name="remote_download" {{ 'checked' if song.remote_download }}> remote_download</label>
     <label>bg <input name="bg" value="{{ song.bg }}" list="bg-list"></label>
-    <label>date <input name="date" value="{{ song.date }}" placeholder="unix seconds (paste seconds or ISO)"
-      data-secdate></label>
+    {{ date_field(song.date) }}
     <label>version <input name="version" value="{{ song.version }}"></label>
     {{ jacket_widget('jacket', song.jacket, song.song_id) }}
     <label>jacket_designer <input name="jacket_designer" value="{{ song.jacket_designer or '' }}"></label>
@@ -189,15 +198,20 @@
   <h2>Charts</h2>
   {% for diff in diffs %}
   {% set is_err = diff.difficulty.value == 'err' %}
-  <details class="chart diff-{{ diff.difficulty.value }}" id="chart-{{ diff.id }}">
+  <details class="chart {{ difficulty_tint_class(diff.difficulty) }}"
+           style="{{ difficulty_tint_style(diff.difficulty) }}" id="chart-{{ diff.id }}">
     <summary>{{ difficulty_label(diff.difficulty) }}
-      <span class="chart-stat">Lv {{ display_level(diff.level) }} · CC {{ display_rating(diff.rating) }} · {{ "{:,}".format(diff.note) }} notes</span></summary>
+      {# Summary is a scan surface, so it uses the list presenters ("?"); the
+         inputs below carry the exact round-tripping value. #}
+      <span class="chart-stat">Lv <span class="{{ 'sentinel' if is_sentinel(diff.level) }}">{{ list_level(diff.level) }}</span>
+        · CC <span class="{{ 'sentinel' if is_sentinel(diff.rating) }}">{{ list_rating(diff.rating) }}</span>
+        · <span class="{{ 'sentinel' if diff.note == 0 }}">{{ "{:,}".format(diff.note) }}</span> notes</span></summary>
     <form method="post" action="/difficulties/{{ diff.id }}" data-dirty-track>
       {% if is_err %}
         <label>rating <input value="?" disabled></label>
         <label>level <input value="?" disabled></label>
       {% else %}
-        <label data-tip="db: {{ diff.rating }}">rating (CC) <input name="rating" value="{{ display_rating(diff.rating) }}" placeholder="11.3 / TBA"></label>
+        <label data-tip="db: {{ diff.rating }}">rating (CC) <input name="rating" value="{{ display_rating(diff.rating) }}" placeholder="11.3 / TBA / ?"></label>
         <label data-tip="db: {{ diff.level }}">level <input name="level" value="{{ display_level(diff.level) }}" placeholder="9 / 10+ / TBA / ?"></label>
       {% endif %}
       <label>note <input name="note" type="number" value="{{ diff.note }}"></label>
@@ -275,7 +289,7 @@
           {% for d in addable %}<option value="{{ d.value }}">{{ difficulty_label(d) }}</option>{% endfor %}
         </select>
       </label>
-      <label>rating (CC) <input name="rating" placeholder="11.3 / TBA" data-rating-src></label>
+      <label>rating (CC) <input name="rating" placeholder="11.3 / TBA / ?" data-rating-src></label>
       <label>level <input name="level" placeholder="9 / 10+ / TBA / ?" data-level-prefill></label>
       <label>note <input name="note" type="number" value="0"></label>
       <label>chart_designer <input name="chart_designer" data-designer></label>

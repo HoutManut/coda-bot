@@ -23,6 +23,7 @@ import traceback
 
 import hikari
 
+from coda.config import config
 from coda.logging.formatters import build_embed
 
 _QUEUE_MAXSIZE = 1000
@@ -34,11 +35,12 @@ class DiscordChannelHandler(logging.Handler):
     def __init__(self, channel_id: int, level: int) -> None:
         super().__init__(level=level)
         self._channel_id = channel_id
-        self._queue: asyncio.Queue[hikari.Embed] = asyncio.Queue(maxsize=_QUEUE_MAXSIZE)
-        self._prestart: collections.deque[hikari.Embed] = collections.deque(
+        self._queue: asyncio.Queue[tuple[hikari.Embed, bool]] = asyncio.Queue(
+            maxsize=_QUEUE_MAXSIZE
+        )
+        self._prestart: collections.deque[tuple[hikari.Embed, bool]] = collections.deque(
             maxlen=_QUEUE_MAXSIZE
         )
-        self._app: hikari.RESTAware | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._task: asyncio.Task[None] | None = None
         self._dropped = 0
@@ -49,14 +51,15 @@ class DiscordChannelHandler(logging.Handler):
         except Exception:  # noqa: BLE001 -- a bad format must never crash logging
             self.handleError(record)
             return
+        ping = getattr(record, "ping", False) is True
         if self._loop is None:
-            self._prestart.append(embed)
+            self._prestart.append((embed, ping))
         else:
-            self._loop.call_soon_threadsafe(self._enqueue, embed)
+            self._loop.call_soon_threadsafe(self._enqueue, embed, ping)
 
-    def _enqueue(self, embed: hikari.Embed) -> None:
+    def _enqueue(self, embed: hikari.Embed, ping: bool) -> None:
         try:
-            self._queue.put_nowait(embed)
+            self._queue.put_nowait((embed, ping))
         except asyncio.QueueFull:
             self._dropped += 1
             print(
@@ -66,18 +69,24 @@ class DiscordChannelHandler(logging.Handler):
 
     def start(self, app: hikari.RESTAware, loop: asyncio.AbstractEventLoop) -> None:
         """Bind the live REST app + loop, flush buffered records, spawn the consumer."""
-        self._app = app
         self._loop = loop
         while self._prestart:
-            self._enqueue(self._prestart.popleft())
-        self._task = loop.create_task(self._consume())
+            self._enqueue(*self._prestart.popleft())
+        self._task = loop.create_task(self._consume(app))
 
-    async def _consume(self) -> None:
+    async def _consume(self, app: hikari.RESTAware) -> None:
         while True:
-            embed = await self._queue.get()
+            embed, ping = await self._queue.get()
+            owner_id = config.main_owner_id
+            content = f"<@{owner_id}>" if ping and owner_id else None
             try:
-                await self._app.rest.create_message(self._channel_id, embed=embed)
-            except Exception:  # noqa: BLE001 -- never re-log; that would feed back here
+                await app.rest.create_message(
+                    self._channel_id,
+                    content=content,
+                    embed=embed,
+                    user_mentions=[owner_id] if content else False,
+                )
+            except Exception:  # noqa: BLE001 -- never re-log; that would feed back into here
                 traceback.print_exc(file=sys.stderr)
             finally:
                 self._queue.task_done()

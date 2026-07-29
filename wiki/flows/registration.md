@@ -4,7 +4,9 @@ status: active
 entrypoint: "/register method:code|account (src/coda/extensions/register.py)"
 touches: [players, sessions, arcaea, db]
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-23
+verified: 2026-07-29
+grade: A
 tags: [flow, registration, arcaea]
 ---
 
@@ -128,7 +130,28 @@ account belongs to the caller.
   `is_owner` is flushed to `False` *before* the new owner row is inserted, so the partial
   unique index (`at most one is_owner per account`) never observes two owners at once.
 
+## Post-registration welcome (both paths)
+
+Both `_link` outcomes that end in an actual link (`Linked`, `_prove_in_place`,
+`ProvenOverCode`, `ProvenCoexists`) end at the same ephemeral in-channel embed,
+built by `_send_welcome` in `register.py` (2026-07-23; answers
+[[h-welcome-message-update]]). Two facts get called out explicitly because
+they now default oppositely:
+
+- **Tracking** — on by default, `/tracking state:off` to stop.
+- **Live updates** — off by default (see [[live-updates|Live Updates (poster)]]
+  for the `DEFAULT_ENABLED` flip this reflects). The embed checks
+  `LiveUpdateService.is_allowed` on the **invoking channel**: if that channel
+  is already allowlisted, an inline "Enable live updates here" button appears
+  and does `set_destination` + `set_enabled(True)` on click; otherwise the
+  text just points at `/liveupdates on` (defaults to DM) or `/liveupdates channel`.
+
+The `ProvenOverCode` branch (`_resolve_stale_links`, keep-or-remove prompt for
+demoted code-linkers) does **not** go through this welcome embed — it ends at
+its own keep/remove confirmation instead.
+
 ## Related
 
-`[[players]]`, `[[sessions (module)]]`, `[[arcaea (module)]]`,
-`[[Session Lease]]`, `[[w-friend-code-strip]]`, `[[w-honest-bot-code-refusal]]`
+[[players]], [[sessions|sessions (module)]], [[arcaea|arcaea (module)]],
+[[session-lease|Session Lease]], [[live-updates|Live Updates (poster)]],
+[[w-friend-code-strip]], [[w-honest-bot-code-refusal]]

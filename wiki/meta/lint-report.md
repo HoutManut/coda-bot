@@ -7,7 +7,6 @@ updated: 2026-07-21
 tags: [meta, lint]
 aliases: ["Lint Report — 2026-07-21"]
 ---
-
 # Lint Report — 2026-07-21
 
 > [!done] Remediation applied 2026-07-21, after this report was written

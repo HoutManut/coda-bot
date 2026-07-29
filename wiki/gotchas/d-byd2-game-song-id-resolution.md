@@ -3,7 +3,8 @@ type: gotcha
 status: active
 severity: high
 area: catalog
-verified:
+verified: 2026-07-29
+grade: B
 created: 2026-07-21
 updated: 2026-07-21
 tags: [gotcha, catalog, wire, score-mapping]
@@ -20,7 +21,7 @@ song.
 
 ## Cause
 
-See [[Score Mapping]] and [[Catalog]] §"Last" — double Beyond. "Last | Eternity" is a **separate
+See [[score-mapping|Score Mapping]] and [[catalog|Catalog]] §"Last" — double Beyond. "Last | Eternity" is a **separate
 song entry** in the game's own data (`song_id: "lasteternity"`), not a second difficulty row
 under `"last"`. Our catalog consolidates it as a sibling `song_difficulties` row under
 `song_id = 'last'`, `difficulty = 'byd_2'`, `game_song_id = 'lasteternity'` — but the *wire* score
@@ -50,7 +51,7 @@ wrong row if some other chart happens to share those coordinates.
 
 ## The right handling
 
-Resolve in this order (see [[Score Mapping]] §Resolution algorithm):
+Resolve in this order (see [[score-mapping|Score Mapping]] §Resolution algorithm):
 
 ```
 1. song_difficulties.game_song_id = wire.song_id AND class matches wire.difficulty
@@ -63,9 +64,14 @@ Resolve in this order (see [[Score Mapping]] §Resolution algorithm):
 Step 1 must run first — it is not an optimization, it is the only path that can ever match a
 `byd_2` play.
 
-**Open verification gap** (from the source itself): the exact wire payload for a `lasteternity`
-play has not been captured; the `difficulty: 3` assumption is owner-stated domain knowledge that
-matches seed data but should be confirmed the first time a real one is observed.
+> [!bug] stale vs shipped code — step 1's difficulty check
+> Re-verified 2026-07-29 against `src/coda/catalog/chart_resolution.py`: step 1 matches on
+> `game_song_id` alone. The code's own comment explains why a difficulty guard is deliberately
+> **absent** there — `byd_2` arrives as wire `difficulty: 3` (`byd`'s value), which would be
+> excluded by a "class matches wire.difficulty" filter, i.e. exactly the row step 1 exists to
+> catch. The `game_song_id` match is already unique without it. "AND class matches
+> wire.difficulty" in step 1 above does not reflect the shipped implementation; step 2's
+> difficulty check is accurate. Same correction applies to [[score-mapping|Score Mapping]].
 
 ## Regression signal
 

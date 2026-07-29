@@ -7,6 +7,8 @@ depends_on: [arcaea, db]
 used_by: [players, scores]
 created: 2026-07-21
 updated: 2026-07-21
+verified: 2026-07-29
+grade: A
 tags: [module, sessions, arcaea]
 aliases: ["sessions (module)"]
 ---
@@ -75,5 +77,5 @@ only in the archived API-layer findings writeup (2026-07-19) — [[arcaea-api-la
 
 ## Related
 
-`[[Session Lease]]`, `[[Registration]]`, `[[arcaea (module)]]`,
-`[[players]]`, `[[w-release-order]]`, `[[w-third-auth-envelope]]`
+[[session-lease|Session Lease]], [[registration|Registration]], [[arcaea|arcaea (module)]],
+[[players]], [[w-release-order]], [[w-third-auth-envelope]]

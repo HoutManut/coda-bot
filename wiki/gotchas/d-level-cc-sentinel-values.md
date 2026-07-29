@@ -20,7 +20,7 @@ level/CC of `0` and sort into the catalog next to genuinely easy/low-CC charts.
 
 ## Cause
 
-Both `level` and `rating` (chart constant, see [[Catalog]]) are stored as plain integers with
+Both `level` and `rating` (chart constant, see [[catalog|Catalog]]) are stored as plain integers with
 two **distinct** sentinel meanings sharing the same small-integer space as real data:
 
 | Stored | Meaning |

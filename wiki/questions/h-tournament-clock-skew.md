@@ -13,7 +13,7 @@ aliases: ["How much does the bot's clock skew from lowiro's server clock?"]
 
 ## Why it is open
 
-Score validity for tournaments (`valid(score, round)`, [[Tournaments]] §2)
+Score validity for tournaments (`valid(score, round)`, [[tournaments|Tournaments]] §2)
 compares `score.time_played` (server-assigned at submission) against a
 round's `[start, end]` window drawn from the bot's own clock. The player's
 device clock is provably irrelevant — `time_played` is server-assigned and

@@ -7,6 +7,8 @@ depends_on: []
 used_by: [sessions, players, scores]
 created: 2026-07-21
 updated: 2026-07-21
+verified: 2026-07-29
+grade: A
 tags: [module, arcaea, wire]
 aliases: ["arcaea (module)"]
 ---
@@ -97,7 +99,7 @@ current docstrings as the current state.
 
 ## Related
 
-`[[Registration]]`, `[[Session Lease]]`, `[[sessions]]`,
-`[[w-formdata-504]]`, `[[w-third-auth-envelope]]`, `[[w-status-vs-body]]`,
-`[[w-coherent-browser-identity]]`, `[[w-arcaea-never-imports-db]]`,
-`[[w-hand-built-multipart]]`, `[[w-branch-on-body-not-status]]`
+[[registration|Registration]], [[session-lease|Session Lease]], [[sessions]],
+[[w-formdata-504]], [[w-third-auth-envelope]], [[w-status-vs-body]],
+[[w-coherent-browser-identity]], [[w-arcaea-never-imports-db]],
+[[w-hand-built-multipart]], [[w-branch-on-body-not-status]]

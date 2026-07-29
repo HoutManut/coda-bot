@@ -4,12 +4,12 @@ status: active
 path: 10-score-history-backfill-research.md
 lines: 92
 dated: "2026-07-21"
-verified: 2026-07-21
+verified: 2026-07-23
 supersedes: []
 superseded_by: []
 created: 2026-07-21
-updated: 2026-07-21
-tags: [source, handoffs, backfill, research, unbuilt]
+updated: 2026-07-23
+tags: [source, handoffs, backfill, research]
 aliases: ["10 — Score history backfill (research)"]
 ---
 
@@ -50,6 +50,40 @@ b30 works today on accumulated rows; backfill only improves inputs.
   `src/coda/db/models/play_score.py`, so the constraint is real, not
   speculative.
 
+## Wire capture (verified 2026-07-23)
+
+Live-captured `GET /webapi/score/rating/me` on a subscribed account, browser session.
+Corrects/sharpens this doc's earlier abstract description — **"only 30 entries" was
+imprecise**; the envelope carries both pools, named, at 30+10:
+
+```
+{"success":true,"value":{
+  "best_rated_scores":   [ ...30 entries... ],   // b30
+  "recent_rated_scores": [ ...10 entries... ]    // r10
+}}
+```
+
+Per-entry fields: `song_id, difficulty, modifier, rating, score, perfect_count,
+near_count, miss_count, clear_type, title{en,ja}, artist, time_played, bg`. Notably
+**no** `shiny_perfect_count`, `best_clear_type`, `yearly_play_count`, `health` — this is
+a single-play record (the play that earned the slot), not the aggregate shape
+`score/song/me/all` returns. `rating` is the server's own precomputed play rating
+(cc + bonus), float, matching [[potential|Potential]]'s encoding.
+
+Directly confirms two claims in [[potential|Potential]] live: `undyingmacula` diff 4
+appeared in **both** `best_rated_scores` (score `9977426`) and `recent_rated_scores`
+(score `9936332`, different `time_played`) simultaneously — the "same chart can occupy
+a slot in both pools" behavior, observed rather than inferred. And `sum(best_rated_scores.rating)
++ sum(recent_rated_scores.rating)` over all 40 entries is the exact PTT formula input.
+
+This settles the "server hands you b30+r10 directly, pre-computed" reading — for
+seeding a **new/other** account's PTT history, `score/rating/me` is a single-request
+snapshot of the current pool state (`time_played` per entry, so it back-dates
+correctly), strictly cheaper than walking `score/song/me/all`. Tradeoff unchanged from
+this doc's original framing: `rating/me` is frozen-at-fetch (today's pool only, no
+older history to replay), while `song/me/all` gets full note-detail + survives CC
+re-evaluation. For seeding b30 specifically, `rating/me` is the correct/cheaper source.
+
 ## Contradicts / reversed by
 
 None. This doc raises open questions rather than making claims another doc
@@ -59,5 +93,5 @@ overriding it.
 
 ## Feeds
 
-`[[h-backfill-unsubscribed-failure-mode]]`, `[[h-backfill-worth-building]]`,
-`[[h-song-me-all-log-vs-record]]`
+[[h-backfill-unsubscribed-failure-mode]], [[h-backfill-worth-building]],
+[[h-song-me-all-log-vs-record]]

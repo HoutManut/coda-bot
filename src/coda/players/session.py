@@ -15,7 +15,7 @@ calls :meth:`handle_invalid` to DM the owner -- once.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 
 import hikari
 from sqlalchemy import Select, select
@@ -53,6 +53,27 @@ class PlayerSessionProvider:
         rows = await self._db.execute(self._pollable())
         for account, credential in rows.all():
             yield account, AccountSession(PlayerCredentialAdapter(credential), self._db)
+
+    async def own_covered(self, arc_user_ids: Iterable[int]) -> set[int]:
+        """Which of those ``arc_user_id``s the own path currently covers.
+
+        Same predicate as :meth:`poll_sessions`, narrowed to the ids asked
+        about, so the answer can never claim coverage the sweep would not
+        deliver: a dead credential or a strayed account drops out here exactly
+        as it drops out there.
+
+        The friend path uses this to yield those players to the own path --
+        see ``scores/poller.py``.
+        """
+        wanted = list(arc_user_ids)
+        if not wanted:
+            return set()
+        rows = await self._db.execute(
+            self._pollable()
+            .with_only_columns(ArcaeaAccount.arc_user_id)
+            .where(ArcaeaAccount.arc_user_id.in_(wanted))
+        )
+        return set(rows.scalars())
 
     async def session_for(
         self, arcaea_account_id: int

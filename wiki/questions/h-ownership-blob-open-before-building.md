@@ -1,10 +1,10 @@
 ---
 type: question
 status: open
-blocks: ["[[Tournaments]]"]
+blocks: ["[[tournaments|Tournaments]]", "song ownership chart-unlock display"]
 source: 11-ownership-blob.md
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-23
 tags: [question, ownership, tournaments, unresearched]
 aliases: ["What has to be settled before the static-picker ownership blob (handoff 11) can be built?"]
 ---
@@ -13,10 +13,16 @@ aliases: ["What has to be settled before the static-picker ownership blob (hando
 
 ## Why it is open
 
+**Second consumer as of 2026-07-23**: a proposed song-ownership display
+(show which charts a user has actually unlocked, not just owns the song —
+PST is always unlocked if owned, BYD/ETR are not) needs exactly item 2 below
+answered, independent of Tournaments. Don't research this twice — resolving
+item 2 unblocks both.
+
 Handoff 11 is explicitly a **sketch from one conversation, not a design** —
 the shape (static page → base64 blob → `/owned import`) is settled, but the
 numbers behind it are estimates from memory, not measured, and its only
-consumer ([[Tournaments]] §9) is itself unbuilt. Four concrete unknowns are
+consumer ([[tournaments|Tournaments]] §9) is itself unbuilt. Four concrete unknowns are
 named as gating anything getting built:
 
 1. **The real pack count and per-song granularity.** The doc estimates

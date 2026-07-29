@@ -22,9 +22,9 @@ the game, not merely a delayed one.
 ## Cause
 
 A play rating needs only `score` + chart CC — both available on the friend path (see
-[[Potential]] §Encoding). But **recent-30 pool admission needs more**: excluding hard-gauge
+[[potential|Potential]] §Encoding). But **recent-30 pool admission needs more**: excluding hard-gauge
 losses requires `clear_type` **and** `modifier` (see [[d-hard-gauge-early-submit]]), and **both
-fields are own-credentials only** (see [[Scoring]]). The friend path returns `score` and nothing
+fields are own-credentials only** (see [[scoring|Scoring]]). The friend path returns `score` and nothing
 else about the play — there is no threshold on `score` alone that reliably distinguishes a
 hard-gauge loss (scores low) from a legitimately bad clear (also scores low) or a legitimately
 high-scoring-but-failed normal-gauge track lost (health < 70 at the end is legal at *any* score).
@@ -39,7 +39,7 @@ loses to the max") is the opposite of r10's rule ("< 9.8M always enters").
 
 Computing r10 on the friend path with the closest available approximation — e.g. "exclude scores
 below some threshold" as a stand-in for the hard-gauge check. This isn't a *lagging* r10 (the
-ordinary, acceptable kind of divergence described in [[Potential]] §5 for missed plays); it is
+ordinary, acceptable kind of divergence described in [[potential|Potential]] §5 for missed plays); it is
 a **different admission rule** than the game's, one that will admit hard-gauge losses lowiro
 rejects and evict legitimate entries in their place. The source is explicit that this is not a
 case to approximate: ordinary tracker drift is *missing data behaving correctly on what it did

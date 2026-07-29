@@ -33,11 +33,16 @@ from coda.db.models import (
 )
 from coda.arcaea.dto.score import ScoreResult
 from coda.db.session import async_session
-from coda.scores import ObservationCache, PollCoordinator
-from coda.scores.embed import score_embed
+from coda.players.live import LiveUpdateService
+from coda.scores import B30Service, ObservationCache, PollCoordinator
+from coda.scores.b30_stat import b30_stat_line
+from coda.scores.embed import PlayerIdentity, score_embed
 from coda.scores.keys import OWN, PollKey
 from coda.scores.service import row_values
+from coda.scores.suppression import PostSuppressor
 from coda.sessions.pool import SessionPool
+from coda.settings import ConfigService
+from coda.settings.zone import effective_zone
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +50,7 @@ loader = lightbulb.Loader()
 
 _NOT_REGISTERED = "You're not registered yet -- run `/register` first."
 _NOT_POLLED = (
-    "That account isn't being tracked right now. Run `/register` again to re-link it."
+    "That account isn't being tracked right now. Run `/register` again to restart it."
 )
 _NO_PLAYS = (
     "No plays recorded yet, play a chart and try again."
@@ -67,10 +72,13 @@ class Recent(
         ctx: lightbulb.Context,
         coordinator: PollCoordinator,
         observations: ObservationCache,
+        settings: ConfigService,
+        b30: B30Service,
+        suppressor: PostSuppressor,
     ) -> None:
-        # A refresh waits on a poll cycle, well past the 3s interaction budget.
-        await ctx.defer()
-
+        # Both checks run before the defer, and both are single indexed reads.
+        # A deferred response fixes its flags at defer time, so anything sent
+        # after it fills that placeholder and loses ``ephemeral``.
         async with async_session() as db:
             account = await _account_of(db, int(ctx.user.id))
             if account is None:
@@ -79,10 +87,13 @@ class Recent(
             key = await _poll_key(db, account)
             account_id = account.id
             arc_user_id = account.arc_user_id
+            tracking_enabled = account.tracking_enabled
 
         if key is None:
             await ctx.respond(_NOT_POLLED, ephemeral=True)
             return
+
+        await ctx.defer()
 
         # Outside any DB session: a cycle can run for tens of seconds and must
         # not pin a Postgres connection while it does.
@@ -96,14 +107,89 @@ class Recent(
                 await ctx.respond(_NO_PLAYS, ephemeral=True)
                 return
             row, chart, song = play
+            player_name = ctx.user.display_name or None
+            zone = await effective_zone(
+                db,
+                settings,
+                guild_id=int(ctx.guild_id) if ctx.guild_id is not None else None,
+                channel_id=int(ctx.channel_id),
+                user_id=int(ctx.user.id),
+            )
             embed, _ = score_embed(
                 row,
                 chart,
                 song,
                 locale=ctx.interaction.locale,
-                night=is_night(int(ctx.user.id)),
+                night=is_night(zone),
+                player=None if player_name is None else PlayerIdentity(
+                    name=player_name,
+                    avatar_url=str(ctx.user.display_avatar_url),
+                ),
+                untracked=not tracking_enabled,
             )
+            # Read live every call, never remembered: a player who hides their
+            # PTT mid-session must stop seeing this line on the very next run.
+            rating, rating_observed = observations.latest_rating(arc_user_id)
+            line = await b30_stat_line(
+                db,
+                b30,
+                row,
+                chart,
+                mode=await _stat_mode(db, settings, ctx),
+                account_id=account_id,
+                tracking_enabled=tracking_enabled,
+                rating_visible=rating_observed and rating is not None,
+            )
+            if line is not None:
+                embed.description = f"{embed.description}\n{line}"
+            await _mark_shown(db, ctx, suppressor, row)
         await ctx.respond(embed=embed)
+
+
+async def _mark_shown(
+    db: AsyncSession,
+    ctx: lightbulb.Context,
+    suppressor: PostSuppressor,
+    row: PlayScore,
+) -> None:
+    """Tell the poster this surface has already displayed the play.
+
+    This command *causes* the duplicate it prevents: ``request_refresh`` drives
+    a real poll cycle, which ingests the play, which is exactly what the poster
+    consumes. Marked only when the reply is going to the very place the user's
+    live updates go -- a different channel has shown nothing and still deserves
+    its post, and the DM stays the user's archive when this ran in a channel.
+
+    A play rendered from the observation cache alone (tracking off) has no row
+    id, and nothing will ever post it, so there is nothing to mark.
+    """
+    if row.id is None:
+        return
+    enabled, channel_id = await LiveUpdateService().resolve_destination(
+        db, int(ctx.user.id)
+    )
+    if not enabled:
+        return
+    if channel_id is not None:
+        if channel_id == int(ctx.channel_id):
+            suppressor.mark(("channel", channel_id), row.id)
+        return
+    if ctx.guild_id is None:
+        suppressor.mark(("dm", int(ctx.user.id)), row.id)
+
+
+async def _stat_mode(
+    db: AsyncSession, settings: ConfigService, ctx: lightbulb.Context
+) -> str:
+    """The caller's resolved ``recent_b30_stat`` preference."""
+    return await settings.resolve(
+        db,
+        "recent_b30_stat",
+        guild_id=int(ctx.guild_id) if ctx.guild_id is not None else None,
+        channel_id=int(ctx.channel_id),
+        user_id=int(ctx.user.id),
+        is_dm=ctx.guild_id is None,
+    )
 
 
 async def _account_of(db: AsyncSession, discord_id: int) -> ArcaeaAccount | None:

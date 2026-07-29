@@ -3,14 +3,16 @@ type: meta
 title: "Index"
 status: active
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-29
 tags: [meta, index]
 aliases: ["coda-bot Wiki — Master Catalog"]
 ---
 
 # coda-bot Wiki — Master Catalog
 
-63 pages. All 16 Layer-1 documents ingested 2026-07-21.
+106 pages. **`domains/chardle.md` and `flows/live-updates.md` split into overview + 3
+sub-pages each 2026-07-29**, following the 2026-07-29 lint pass's over-300-line findings —
+see [[log|Log]]. **`/run` owner terminal designed AND built 2026-07-28** — two decisions, one gotcha, one question (item 1 of which is still open); the trigger was "delete `/config global`", and reading the code found the leak is `/config view` instead. Chardle designed 2026-07-27 from the archived Tenniel prototype — one domain page, one planned module, six decisions, one gotcha, two open questions; nothing built. Its edge-case sweep the same day baked four owner manual notes into the pages and left [[h-chardle-build-time-leftovers]] behind. All 16 Layer-1 documents ingested 2026-07-21; `scores/` + its two flows filed 2026-07-22 from shipped code. Dead links closed 2026-07-23 — see [[hot|Hot Cache]] §Lint status. Four surface-feature questions + the t0 manual-tier decision filed 2026-07-23 from conversation. **b30 backend built 2026-07-23** — see [[h-b30-cache-stores-sum]] and [[scores]]. Poll-schedule phase-vs-absolute gotcha + rate-limit-shape question filed 2026-07-24 during a docstring cleanup pass.
 
 ## Entry points
 
@@ -26,18 +28,17 @@ aliases: ["coda-bot Wiki — Master Catalog"]
 | [[score-mapping\|Score Mapping]] | Wire `(song_id, difficulty)` → `song_difficulties`, difficulty ints, `byd_2` |
 | [[auth-and-sessions\|Auth & Sessions]] | Endpoints, envelopes, `error_code` taxonomy, session lifetime, friend-slot cap |
 | [[tournaments\|Tournaments]] | Rounds, windows, validity, state machine, tiers — **not built** |
+| [[chardle\|Chardle]] | Wordle-over-the-catalog minigame — three modes (daily / free play / custom); overview + build notes. Split 2026-07-29 into [[chardle-clue-columns\|Clue Columns]], [[chardle-discord-surface\|Discord Surface]], [[chardle-mechanics\|Mechanics]] |
 
 ## Modules — `src/coda/`
 
-[[arcaea]] · [[sessions]] · [[players]] · [[db]]
+[[arcaea]] · [[sessions]] · [[players]] · [[scores]] · [[db]] · [[chardle-module|chardle]] (**planned**)
 
-Not yet written: `catalog`, `settings`, `extensions`, `admin`, `approvals`, `utils`.
+Not yet written: `catalog`, `settings`, `extensions`, `admin`, `approvals`, `utils`, `logging`.
 
 ## Flows
 
-[[registration|Registration]] (both paths) · [[session-lease|Session Lease]] · [[live-updates|Live Updates (poster)]] (**planned**)
-
-Not yet written: `Score Poll Loop`, `Chart Resolution`.
+[[registration|Registration]] (both paths) · [[session-lease|Session Lease]] · [[score-poll-loop|Score Poll Loop]] (both read paths) · [[chart-resolution|Chart Resolution]] · [[live-updates|Live Updates (poster)]] (split 2026-07-29 into [[live-updates-filters|Filters]], [[live-updates-poster|Poster]], [[live-updates-suppression|Suppression]])
 
 ## Gotchas — silent-regression traps
 
@@ -49,6 +50,18 @@ Not yet written: `Score Poll Loop`, `Chart Resolution`.
 - [[d-hard-gauge-early-submit|Hard-gauge loss submits early; the r10 exclusion needs BOTH fields]]
 - [[d-r10-impossible-friend-path|r10 cannot be reconstructed on the friend path; b30 can]]
 - [[d-byd2-game-song-id-resolution|`byd_2` needs `game_song_id`, and the step order matters]]
+
+**Catalog / seeding**
+- [[d-reseed-duplicates-renamed-entities|Re-running the seed after admin renames/merges duplicates artists and charters]]
+
+**Scheduling**
+- [[d-poll-schedule-absolute-vs-phase|`PollSchedule._spread` must compare neighbours by phase, not absolute due time]]
+
+**Chardle**
+- [[d-chardle-dead-clue-columns|A clue column can carry zero information — narrow pools kill `level`, `pack`/`version` duplicate each other]]
+
+**Discord surface**
+- [[d-autocomplete-is-a-hint|Autocomplete is a hint, not a constraint — and a chosen row replaces the whole option value]]
 
 **Wire / transport**
 - [[w-formdata-504|`aiohttp.FormData` hangs `add_friend`, then Cloudflare 504s]]
@@ -77,21 +90,49 @@ Not yet written: `Score Poll Loop`, `Chart Resolution`.
 - [[h-straying-preserves-history|Straying keeps `play_scores` — fixed policy, not a tradeoff]]
 - [[h-bot-accounts-excluded-bidirectionally|Bot accounts excluded in both directions]]
 - [[h-no-orm-relationships|No `relationship()` anywhere; joins are explicit]]
+- [[h-t0-manual-tier-b30|t0: no account link, manual-only score entry, b30 computed from it]]
+- [[h-b30-cache-stores-sum|b30 backend: on-demand compute, no cache; configurable limit; source-agnostic]]
+
+**Discord surface**
+- [[h-owner-surface-is-run-terminal|Owner-only operations live behind one `/run` terminal, not owner-gated slash options]] (**not built**)
+- [[h-config-audience-declared-on-key|A config key declares its own audience; every user-facing picker filters on it]] (**not built**)
+
+**Chardle**
+- [[h-chardle-puzzle-rows-not-modes|A Chardle mode is a shape of rows, not a class]] (partly superseded)
+- [[h-chardle-boards-are-channel-owned|A Chardle board is owned by where it lives; only dailies are per-user]]
+- [[h-chardle-puzzle-number-not-date|Dailies are numbered globally; guild timezone moves only the unlock instant]]
+- [[h-chardle-closest-match-always-costs|Ambiguous guesses resolve to the answer if possible, else to the closest match — and always cost an attempt]]
+- [[h-chardle-extra-pool-hides-class|The extras pool merges Beyond and Eternal and reveals only "Extra"]]
+- [[h-chardle-err-is-an-event|`err` is a dated event: guaranteed April 1, 25% that week, 0.3% otherwise, never a random daily]]
 
 ## Questions — open
 
 | Question | Blocks |
 |---|---|
-| [[h-backfill-worth-building\|Are there enough tier-3 users to justify backfill at all?]] | backfill |
-| [[h-backfill-unsubscribed-failure-mode\|What do the score endpoints return with no subscription?]] | backfill |
-| [[h-song-me-all-log-vs-record\|Is `score/song/me/all` a play log or one row per chart?]] | backfill, b30 |
-| [[h-credentials-changed-server-side\|Can a stored credential go stale server-side?]] | own path |
-| [[h-live-update-post-filters\|What filters decide whether a play is worth posting?]] | live poster |
-| [[h-recent-duplicate-suppression\|Suppress or merely delay a play `/recent` already showed?]] | live poster |
-| [[h-ownership-blob-open-before-building\|What must settle before the ownership blob is built?]] | ownership blob |
-| [[h-catalog-schema-open-questions\|What is unresolved in the catalog schema design?]] | catalog |
+| [[h-ownership-blob-open-before-building\|What must settle before the ownership blob is built?]] | ownership blob, chart-unlock display |
 | [[h-tournament-attempt-overhead\|How long is song-select → load → results, really?]] | tournaments |
 | [[h-tournament-clock-skew\|How far does the bot's clock skew from lowiro's?]] | tournaments |
+| [[h-recent-config-ptt-b30-r10\|Should /recent be configurable to show ptt/b30/r10 impact?]] | /recent rating-impact config |
+| [[h-r30-queue-view\|What does a comprehensive r30 queue view need?]] | /r30 command |
+| [[h-manual-score-import\|What does manual score importing need before it can be built?]] | manual score import feature |
+| [[h-course-mode-ptt-detection\|How do we detect a play was made in course mode, so it can be excluded from PTT?]] | b30/r10 backend correctness, score ingest |
+| [[h-real-rate-limit-shape-unknown\|What does a real rate limit or Cloudflare challenge from lowiro actually look like?]] | removing `arcaea/client.py`'s temporary diagnostic-logging block |
+| [[h-chardle-board-rendering\|How is a Chardle board rendered?]] | chardle — every other rule is settled |
+| [[h-chardle-build-time-leftovers\|What is still unsettled in Chardle at build time?]] | chardle — sweep policy, `bpm`/`note` thresholds, ephemeral fallback, answer-deletion path (private-thread item answered 2026-07-27) |
+| [[h-run-terminal-build-time\|What is still unsettled about `/run` before it is built?]] | `/run`, settings — autocomplete replacement capture, the `set_value` no-coercion bug, first verb set, DM `contexts`, audience for the existing 11 keys |
+
+## Questions — answered
+
+| Question | Answer |
+|---|---|
+| [[h-backfill-unsubscribed-failure-mode\|What do the score endpoints return with no subscription?]] | `400 {"success":false,"error_code":1401}` on both `score/rating/me` and `score/song/me/all` — verified 2026-07-23 |
+| [[h-song-me-all-log-vs-record\|Is `score/song/me/all` a play log or one row per chart?]] | Per-chart record, confirmed by replay — worse attempt left row unchanged except `yearly_play_count` — verified 2026-07-23 |
+| [[h-backfill-worth-building\|Are there enough tier-3 users to justify backfill at all?]] | ~4 total (owner+3) — worth it scoped to the cheap `rating/me` path, not the heavy `song/me/all` walk — 2026-07-23 |
+| [[h-credentials-changed-server-side\|Can a stored credential go stale server-side?]] | Already resolved 2026-07-18 in `errors.py`/[[w-third-auth-envelope]] — just never cross-linked; handling is correct as shipped |
+| [[h-welcome-message-update\|What should the post-registration welcome message say now?]] | Shipped 2026-07-23 in `_send_welcome` — explicit tracking-on/live-updates-off callout, inline enable button when the channel is allowlisted |
+| [[h-live-update-post-filters\|What filters decide whether a play is worth posting?]] | Triggers OR-ed (`all`/`pb`/`bX`/`pm`/`fr`/`grade_up`), gates AND-ed (`min_level` + per-channel guild floor); per-user columns on `live_update_prefs`; default `pb`; b30 aggregate never printed. **Built 2026-07-24** in `scores/filters.py` — 2026-07-24 |
+| [[h-recent-duplicate-suppression\|Suppress or merely delay a play `/recent` already showed?]] | Suppress. `/recent` *causes* the duplicate by triggering the poll; marker keyed `(destination, play_score_id)`, TTL 15 min. **Built 2026-07-24** in `scores/suppression.py` — 2026-07-24 |
+| [[h-catalog-schema-open-questions\|What is unresolved in the catalog schema design?]] | 12/14 override fields used (name_jp, remote_download never fire); artist/charter seeded automatically in `seed.py`; search-config still placeholder values, never tuned; `packs.release_date` is manual-only, not derived — 2026-07-23 |
 
 ## Sources — archived originals
 
@@ -100,7 +141,7 @@ from; the originals are archived outside this repository.
 
 Domain + implementation docs: [[arcaea-domain-reference]] · [[arcaea-scoring]] · [[arcaea-potential]] · [[arcaea-score-mapping]] · [[arcaea-auth-behavior]] · [[arcaea-api-layer]] · [[arcaea-api-research-tasks]] · [[arcaea-bot-db-schema]] · [[arcaea-tournament-layer]]
 
-Handoff notes (designed-but-unbuilt work units): [[handoffs-readme]] · [[handoff-06-credentials-changed-server-side|06 — credentials changed server-side]] · [[handoff-08-live-updates-poster|08 — live-updates poster]] · [[handoff-09-b30|09 — b30]] · [[handoff-10-score-history-backfill-research|10 — score-history backfill]] · [[handoff-11-ownership-blob|11 — ownership blob]]
+Handoff notes (designed-but-unbuilt work units): [[handoffs-readme]] · [[handoff-06-credentials-changed-server-side|06 — credentials changed server-side]] · [[handoff-08-live-updates-poster|08 — live-updates poster]] · [[handoff-09-b30|09 — b30]] · [[handoff-10-score-history-backfill-research|10 — score-history backfill]] · [[handoff-11-ownership-blob|11 — ownership blob]] · [[handoff-12-recent-b30-config|12 — /recent b30 stat config]]
 
 `docs/`: [[self-hosting]]
 
@@ -115,10 +156,8 @@ lint treats a target listed here as intentional.
 |---|---|---|
 | `b30` | `flows/` or `domains/` | 5 pages |
 | `Score history backfill` | `flows/` | 4 pages |
-| `Score Poll Loop` | `flows/` | `domains/tournaments` ×2 |
 | `h-tournament-scoring-rule-parameter` | `decisions/` | tournaments ×3 |
 | `h-manual-bot-account-creation` | `decisions/` | `sources/self-hosting` ×2 |
-| `h-b30-cache-stores-sum` | `decisions/` | `sources/handoff-09-b30` |
 | `h-no-catalog-inferred-ownership` | `decisions/` | `sources/arcaea-tournament-layer` |
 
 ## Meta

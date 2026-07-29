@@ -26,11 +26,11 @@ shape. Companion to `arcaea-scoring.md` and `arcaea-potential.md`.
 ## Key claims
 
 - Level stored as `game_level*2` (no `+`) or `game_level*2+1` (`+`); sentinels `0`=TBA,
-  `-1`=`?` (err-only) — domain knowledge, not a wire capture. See [[Catalog]].
+  `-1`=`?` (err-only) — domain knowledge, not a wire capture. See [[catalog|Catalog]].
 - Chart constant (`rating` on `song_difficulties`) stored ×10; sentinels `0`=TBA, `-1`=`?`
-  (err-only) — same domain-knowledge status. See [[Catalog]]. Do not confuse this field with
+  (err-only) — same domain-knowledge status. See [[catalog|Catalog]]. Do not confuse this field with
   the differently-scaled player PTT field of the same name (`rating` ×100 on friend/player
-  objects) — see [[d-ptt-hidden-sentinel]] and [[Potential]].
+  objects) — see [[d-ptt-hidden-sentinel]] and [[potential|Potential]].
 - `ftr` is the source of all song-level defaults (the `default` block); `level`, `rating`,
   `note`, `chart_designer` are always difficulty-specific and never inherited.
 - Artist/charter links default to song level but can be overridden per-difficulty via
@@ -41,7 +41,7 @@ shape. Companion to `arcaea-scoring.md` and `arcaea-potential.md`.
 - "Last" is the only song with two Beyond charts; `byd_2` ("Last | Eternity") is app-defined —
   the game stores it as a **separate song entry** (`song_id: "lasteternity"`) that the app
   consolidates as a sibling difficulty row under `song_id: "last"`. Feeds directly into
-  [[Score Mapping]] and [[d-byd2-game-song-id-resolution]].
+  [[score-mapping|Score Mapping]] and [[d-byd2-game-song-id-resolution]].
 - `err` (April Fools) charts store `level`/`rating` as `-1` and are hidden from broad search;
   some are later promoted to `byd`, which always wins in search over the surviving `err` row.
 - Pack display name is stored **per song**, not on the pack entity — songs sharing a `pack_id`
@@ -58,4 +58,4 @@ contradicted, by `arcaea-score-mapping.md` §2's wire capture.
 
 ## Feeds
 
-[[Catalog]], [[Score Mapping]], [[d-level-cc-sentinel-values]], [[d-byd2-game-song-id-resolution]]
+[[catalog|Catalog]], [[score-mapping|Score Mapping]], [[d-level-cc-sentinel-values]], [[d-byd2-game-song-id-resolution]]

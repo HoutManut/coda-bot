@@ -22,6 +22,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coda.admin.deps import get_session
+from coda.admin.forms import form_text
 from coda.admin.presenters import seed_category_color
 from coda.admin.templating import templates
 from coda.catalog.slug import slugify
@@ -68,16 +69,22 @@ async def vocab(
     ).all()
     tags = (await session.scalars(select(Tag).order_by(Tag.label))).all()
     # usage counts so the page can warn before deleting a tag that is in use.
-    song_counts = dict(
-        (await session.execute(
-            select(SongTag.tag_id, func.count()).group_by(SongTag.tag_id)
-        )).all()
-    )
-    diff_counts = dict(
-        (await session.execute(
-            select(DifficultyTag.tag_id, func.count()).group_by(DifficultyTag.tag_id)
-        )).all()
-    )
+    song_counts = {
+        tag_id: count
+        for tag_id, count in (
+            await session.execute(
+                select(SongTag.tag_id, func.count()).group_by(SongTag.tag_id)
+            )
+        ).all()
+    }
+    diff_counts = {
+        tag_id: count
+        for tag_id, count in (
+            await session.execute(
+                select(DifficultyTag.tag_id, func.count()).group_by(DifficultyTag.tag_id)
+            )
+        ).all()
+    }
     tags_by_cat: dict[int, list] = {c.id: [] for c in categories}
     for t in tags:
         tags_by_cat.setdefault(t.category_id, []).append(
@@ -127,7 +134,7 @@ async def reorder_categories(
     category ids in their new on-screen order; each row's ``sort`` is set to its
     index so the page's ``ORDER BY sort`` reflects the drag."""
     form = await request.form()
-    ids = [int(x) for x in (form.get("order") or "").split(",") if x.strip()]
+    ids = [int(x) for x in form_text(form, "order").split(",") if x.strip()]
     for i, cid in enumerate(ids):
         await session.execute(
             update(TagCategory).where(TagCategory.id == cid).values(sort=i)
@@ -148,12 +155,12 @@ async def update_category(
         return _redirect("/tags", "Category not found.")
     form = await request.form()
     if "label" in form:
-        label = (form.get("label") or "").strip()
+        label = form_text(form, "label").strip()
         if not label:
             return _redirect("/tags", "Category label is required.")
         cat.label = label
     if "slug" in form:
-        slug = slugify(form.get("slug") or "")
+        slug = slugify(form_text(form, "slug"))
         if not slug:
             return _redirect("/tags", "Category slug is required.")
         clash = await session.scalar(
@@ -163,7 +170,7 @@ async def update_category(
             return _redirect("/tags", f"Category {slug!r} already exists.")
         cat.slug = slug
     if "color" in form:
-        cat.color = (form.get("color") or "").strip() or None
+        cat.color = form_text(form, "color").strip() or None
     await session.commit()
     return _redirect("/tags")
 

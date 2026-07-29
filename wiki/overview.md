@@ -12,7 +12,7 @@ aliases: ["coda-bot — Overview"]
 
 > [!warning] Stub
 > Written from `CLAUDE.md` at scaffold time, not from ingested sources. Every claim here is
-> re-derived and dated once the relevant source is ingested. See [[Ingest Queue]].
+> re-derived and dated once the relevant source is ingested. See [[ingest-queue|Ingest Queue]].
 
 ## What it is
 
@@ -42,7 +42,7 @@ arcaea/  +  db/     wire layer and persistence — arcaea/ NEVER imports db/
 
 The `arcaea/` → `db/` ban is load-bearing, not stylistic: importing `coda.db` builds the
 async engine at import time, so a violation makes the wire layer unimportable without a
-live database. See [[Decision — arcaea never imports db]] (pending).
+live database. See [[w-arcaea-never-imports-db|arcaea never imports db]] (pending).
 
 ## Stack
 

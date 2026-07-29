@@ -6,7 +6,6 @@ created: 2026-07-21
 updated: 2026-07-21
 tags: [meta, conventions]
 ---
-
 # Conventions
 
 ## Frontmatter
@@ -57,4 +56,4 @@ and note the wire name once, where the mapping is described.
 ## Linking
 
 Link liberally. A `[[Page]]` with no file yet marks work worth doing, not an error —
-`wiki-lint` reports them as intentional stubs when the target is listed in [[Index]].
+`wiki-lint` reports them as intentional stubs when the target is listed in [[index|Index]].

@@ -2,7 +2,8 @@
 type: domain
 status: active
 source: arcaea-scoring.md
-verified: 2026-07-17
+verified: 2026-07-29
+grade: B
 created: 2026-07-21
 updated: 2026-07-21
 tags: [domain, arcaea, scoring]
@@ -43,7 +44,7 @@ score = base + shiny_pure_count
 - MAX (every note shiny) → `10,000,000 + note_count`.
 - Minimum → `0` (all lost).
 - Score is an **8-digit** value. `note_count` comes from `song_difficulties.note` — never
-  derivable from the score itself (see [[Score Mapping]] §5).
+  derivable from the score itself (see [[score-mapping|Score Mapping]] §5).
 
 **Verified against a captured own-credentials play** (Vexaria FTR, 2026-07-17):
 `pure=656 far=31 lost=47 shiny=602`, `note_count=734` →
@@ -70,7 +71,14 @@ Thresholds on score alone, independent of gauge/clear type/CC:
 | D     | below 8,600,000 |
 
 Grade boundaries do **not** all line up with the play-rating breakpoints (9.8M and 10M — see
-[[Potential]] §Encoding). EX at 9.8M is shared; EX+ at 9.9M has no rating significance.
+[[potential|Potential]] §Encoding). EX at 9.8M is shared; EX+ at 9.9M has no rating significance.
+
+> [!bug] stale vs shipped code — C threshold
+> Re-verified 2026-07-29 against `src/coda/utils/scoring.py`: the shipped `C` constant is
+> `8_500_000`, not `8,600,000` as this table states (`D` is therefore "below 8,500,000" in code).
+> EX+/EX/AA/A/B all match the shipped constants exactly. Re-capture which value is actually
+> in-game-correct before trusting either — this page and the code currently disagree and neither
+> has been re-confirmed against a live capture since 2026-07-17.
 
 ### Clear types
 
@@ -117,23 +125,14 @@ because reaching 0 ends the play immediately.
 | Clear type                  | yes | **no** |
 | Gauge, HP                   | yes | **no** |
 
-A friend-path 9,872,937 could be a clean run or a near-fail scrape — indistinguishable. Product
-constraint, not an implementation gap.
+A friend-path 9,872,937 could be a clean run or a near-fail scrape — indistinguishable. Product constraint, not an implementation gap.
 
 ## Traps
 
-- **`score: 0` is a real score** (all notes lost) — not a missing/null sentinel. See
-  [[d-score-zero-is-real]].
-- **A hard-gauge loss submits early** — HP hitting 0 ends the play instantly and the score
-  submits then, seconds into the chart, not at song length. It's the only sub-song-length score,
-  and the only play excluded from the PTT recent-30 pool (discriminator `clear_type==0` **AND**
-  `modifier==2`, never `clear_type==0` alone). See [[d-hard-gauge-early-submit]] and
-  [[Potential]] §Traps.
-- **Both `clear_type` and `modifier` are own-credentials only** — the friend path cannot
-  identify a hard-gauge loss or any other clear/gauge detail at all, which is what makes r10
-  reconstruction impossible on that path. See [[d-r10-impossible-friend-path]].
-- Do not conflate `clear_type == 0` (track_lost, any gauge) with the hard-gauge-only recent-30
-  exclusion — a full-length normal/easy-gauge track lost still enters the pool normally.
+- **`score: 0` is a real score** (all notes lost) — not a missing/null sentinel. See [[d-score-zero-is-real]].
+- **A hard-gauge loss submits early** — HP hitting 0 ends the play instantly and the score submits then, seconds into the chart, not at song length. It's the only sub-song-length score, and the only play excluded from the PTT recent-30 pool (discriminator `clear_type==0` **AND** `modifier==2`, never `clear_type==0` alone). See [[d-hard-gauge-early-submit]] and [[potential|Potential]] §Traps.
+- **Both `clear_type` and `modifier` are own-credentials only** — the friend path cannot identify a hard-gauge loss or any other clear/gauge detail at all, which is what makes r10 reconstruction impossible on that path. See [[d-r10-impossible-friend-path]].
+- Do not conflate `clear_type == 0` (track_lost, any gauge) with the hard-gauge-only recent-30 exclusion — a full-length normal/easy-gauge track lost still enters the pool normally.
 
 ## Source
 

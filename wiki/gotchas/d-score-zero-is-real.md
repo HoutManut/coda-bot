@@ -19,7 +19,7 @@ treated as "no score yet" for a chart the player has actually attempted and fail
 
 ## Cause
 
-`score = floor(10_000_000 * (pure + far/2) / note_count) + shiny_pure_count` (see [[Scoring]])
+`score = floor(10_000_000 * (pure + far/2) / note_count) + shiny_pure_count` (see [[scoring|Scoring]])
 is a real formula with a real minimum: if `pure_count == far_count == shiny_pure_count == 0`
 (every note lost), the formula evaluates to exactly `0`. That is a legitimate, fully-formed
 result — the chart was played and the score is `0` — not an absence of data. This sits alongside

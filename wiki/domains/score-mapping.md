@@ -2,7 +2,8 @@
 type: domain
 status: active
 source: arcaea-score-mapping.md
-verified:
+verified: 2026-07-29
+grade: B
 created: 2026-07-21
 updated: 2026-07-21
 tags: [domain, arcaea, score-mapping, wire]
@@ -17,7 +18,7 @@ Both score paths (own-credentials and friend) identify a chart with exactly two 
 `song_id` (game-native string) and `difficulty` (int). Together they are the join key into our
 catalog's `song_difficulties` table. Resolving that join correctly requires handling two
 app-defined difficulty classes — `byd_2` and `err` — that have no wire representation of their
-own (see [[Catalog]] §3.2).
+own (see [[catalog|Catalog]] §3.2).
 
 ## Encoding
 
@@ -79,6 +80,17 @@ in our code, not a case to support.
 3. no match → unknown chart (log + surface raw song_id; do not discard the score)
 ```
 
+> [!bug] stale vs shipped code — step 1 does not check difficulty
+> Re-verified 2026-07-29 against `src/coda/catalog/chart_resolution.py`. Step 1 there matches
+> **only** on `game_song_id` — it deliberately does **not** filter on `wire.difficulty`, because
+> `byd_2` arrives as wire `difficulty: 3` (the `byd` class) while the row's own class is `byd_2`;
+> the code's own comment says filtering on it "would exclude the very row this step exists to
+> catch." A `game_song_id` match is unique on its own (each consolidated entry is single-chart
+> in-game), so no difficulty guard is needed or applied. This page's "AND the row's class maps to
+> wire.difficulty" clause for step 1 is incorrect for the shipped implementation — do not port it
+> into new code. Step 2's difficulty check is accurate as written. The same wording appears in
+> [[d-byd2-game-song-id-resolution]] and should be read with the same correction.
+
 **Step 1 must run first.** A `lasteternity` wire ID falling through to step 2 finds nothing and
 silently drops a legitimate play.
 
@@ -94,7 +106,7 @@ silently drops a legitimate play.
   the catalog is reseeded. Log it and surface the raw ID; never discard the score — the seed can
   catch up later and the play still happened.
 - **The wire never sends note count or CC.** `song_difficulties.note` (needed to decompose/
-  verify a score — see [[Scoring]]) and CC (needed for play rating — see [[Potential]]) both
+  verify a score — see [[scoring|Scoring]]) and CC (needed for play rating — see [[potential|Potential]]) both
   live only in the catalog. Catalog freshness is therefore a correctness dependency of the score
   path, not just a display concern.
 

@@ -7,12 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/app.css">
-  <script src="/static/htmx.min.js" defer></script>
-  <script src="/static/jacket.js" defer></script>
-  <script src="/static/admin.js" defer></script>
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  <script src="{{ asset('htmx.min.js') }}" defer></script>
+  <script src="{{ asset('jacket.js') }}" defer></script>
+  <script src="{{ asset('admin.js') }}" defer></script>
 </head>
-<body hx-boost="true">
+<body hx-boost="true" hx-swap="innerHTML show:none">
   <header>
     <div class="bar">
       <a class="brand" href="/songs">Coda<span class="dim">Catalog</span></a>

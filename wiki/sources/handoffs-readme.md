@@ -53,7 +53,7 @@ two unresearched notes (06, 11).
   the first refresh caller. Durable design now lives in
   [[arcaea-api-layer]] §7–§8 (Tier 2, not this ingest).
 - Handoff 08 (live-updates poster) is the **only remaining unbuilt piece** of
-  score tracking, depending on landed 07. See [[Live Updates]].
+  score tracking, depending on landed 07. See [[live-updates|Live Updates]].
 - b30 (09) depends on nothing unbuilt; 10 (backfill research) is an
   independent input upgrade, not a blocker for 09.
 
@@ -65,6 +65,6 @@ stale (the original design was never written to a source doc).
 
 ## Feeds
 
-`[[db]]` (player_links unique-discord-id constraint),
-`[[h-one-account-per-user]]`, `[[Live Updates]]`, `[[Tournaments]]`
+[[db]] (player_links unique-discord-id constraint),
+[[h-one-account-per-user]], [[live-updates|Live Updates]], [[tournaments|Tournaments]]
 (indirectly, via the landed score-tracking foundation it describes)

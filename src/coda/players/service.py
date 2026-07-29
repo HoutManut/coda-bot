@@ -1,24 +1,8 @@
 """Registration: Discord user -> Arcaea account, by friend code or credentials.
 
-The friend path and the own (credentials) path are ORTHOGONAL, not alternatives.
-A player may end up with neither, either, or both:
-
-    bot_account_id set -> friend path  (batched, score-only)
-    PlayerCredential   -> own path     (per-user, full detail)
-
-Which is why adding credentials to an account you already friend-linked is an
-in-place upgrade of the one link (not a second link), and ``/unlink`` is a plain
-DELETE of the credential that leaves the friend link tracking at tier 1.
-
-One account per Discord user, and no switching. A user holds exactly one
-``PlayerLink`` (``UniqueConstraint("discord_id")``); registering a *different*
-account while linked is refused (``AlreadyLinkedElsewhere``) before any friend
-slot is consumed. Changing accounts means ``/unregister`` first -- that deletes
-the link and, if it was the account's last, *strays* the account: its friend
-slot is released and polling paused, but the row and its ``play_scores`` are
-kept, because there is no score backfill and dropping history is irreversible.
-The reverse cardinality (many Discord users -> one account) stays legal, created
-by the consent flow when someone proves an account another user code-linked.
+Friend path and own (credentials) path are orthogonal, not alternatives; one
+account per Discord user, no switching. See wiki/modules/players.md and
+wiki/flows/registration.md.
 """
 
 from __future__ import annotations
@@ -296,6 +280,9 @@ class RegistrationService:
         # the friend-code path can never provide. This may promote us over prior
         # code-linkers or coexist with another proven owner -- see _link.
         outcome = await self._link(db, discord_id, account, via=LinkMethod.ACCOUNT)
+        assert not isinstance(outcome, NeedsApproval), (
+            "via=ACCOUNT never needs approval -- that branch is CODE-only"
+        )
         await self._store_credential(
             db, account, email, password, sid, expires_at, me, who
         )

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import jacket_widget %}
+{% from "_macros.html" import jacket_widget, date_field %}
 {% block title %}New song{% endblock %}
 {% set f = form if form is defined else none %}
 {% macro v(name) %}{{ (f.get(name) if f else '') or '' }}{% endmacro %}
@@ -39,7 +39,7 @@
   <label class="check"><input type="checkbox" name="world_unlock"> world_unlock</label>
   <label class="check"><input type="checkbox" name="remote_download" checked> remote_download</label>
   <label>bg <input name="bg" value="{{ v('bg') }}" list="bg-list"></label>
-  <label>date <input name="date" value="{{ v('date') }}" placeholder="unix seconds (paste seconds or ISO)" data-secdate></label>
+  {{ date_field(posted_date if posted_date is defined else None) }}
   <label>version <input name="version" value="{{ v('version') or latest_version }}" placeholder="4.7"></label>
   {{ jacket_widget('jacket', v('jacket'), '') }}
   <label>jacket_designer <input name="jacket_designer" value="{{ v('jacket_designer') }}"></label>
