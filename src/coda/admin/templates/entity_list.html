@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sort_th, pager %}
+{% block title %}{{ kind|capitalize }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ kind|capitalize }}</h1></div>
+
+<form method="get" action="/{{ kind }}" class="inline">
+  <input type="search" name="q" value="{{ page.q }}" placeholder="Search {{ kind }}…">
+  <button>Search</button>
+</form>
+
+{{ pager(page) }}
+<table>
+  <thead><tr>
+    {{ sort_th(page, id_col, 'id') }}
+    {{ sort_th(page, 'Name', 'name') }}
+  </tr></thead>
+  <tbody>
+    {% for r in page.items %}
+    <tr onclick="location='/{{ kind }}/{{ r[id_col] }}'">
+      <td><code>{{ r[id_col] }}</code></td>
+      <td>{{ r.name }}{% if kind == 'artists' and r.kind.value == 'unit' %} <span class="badge" title="unit">unit</span>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="2" class="muted">None.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{{ pager(page) }}
+
+<form method="post" action="/{{ kind }}" class="card inline">
+  <h2>New {{ kind[:-1] }}</h2>
+  <input name="id" placeholder="{{ id_col }}" required>
+  <input name="name" placeholder="display name" required>
+  <button>Create</button>
+</form>
+{% endblock %}

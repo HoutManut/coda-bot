@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sort_th, pager %}
+{% block title %}Songs{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Songs</h1>
+  <a class="btn" href="/songs/new">+ New song</a>
+</div>
+
+<input
+  type="search" name="q" value="{{ page.q }}" placeholder="Search by name, id, or alias…"
+  hx-get="/songs" hx-trigger="input changed delay:200ms, search"
+  hx-target="#results" hx-select="#results" hx-swap="outerHTML"
+  hx-push-url="true" autofocus>
+
+<div id="results">
+  {{ pager(page) }}
+  <table>
+    <thead><tr>
+      {{ sort_th(page, '#', 'idx') }}
+      {{ sort_th(page, 'song_id', 'song_id') }}
+      {{ sort_th(page, 'Name', 'name') }}
+      {{ sort_th(page, 'Pack', 'pack') }}
+    </tr></thead>
+    <tbody>
+      {% for song in page.items %}
+      <tr onclick="location='/songs/{{ song.song_id }}'">
+        <td>{{ song.idx }}</td>
+        <td><code>{{ song.song_id }}</code></td>
+        <td>{{ song.name_en }}{% if song.name_jp %} <span class="muted">/ {{ song.name_jp }}</span>{% endif %}</td>
+        <td>{{ song.pack_name }}</td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="muted">No songs match.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {{ pager(page) }}
+</div>
+{% endblock %}

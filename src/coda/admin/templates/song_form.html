@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import jacket_widget %}
+{% block title %}New song{% endblock %}
+{% set f = form if form is defined else none %}
+{% macro v(name) %}{{ (f.get(name) if f else '') or '' }}{% endmacro %}
+{% block content %}
+<div class="page-head"><h1>New song</h1><a href="/songs">← back</a></div>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+{# Shared autosuggest lists (bg names, pack names) populated from existing data. #}
+<datalist id="bg-list">{% for b in bg_options %}<option value="{{ b }}">{% endfor %}</datalist>
+<datalist id="packname-list">{% for p in packname_options %}<option value="{{ p }}">{% endfor %}</datalist>
+
+<form method="post" action="/songs" class="card" data-song-form data-dirty-track>
+  <label>song_id <input name="song_id" value="{{ v('song_id') }}" required
+    data-songid placeholder="auto from name"></label>
+  <label data-tip="Suggested next index; editable, must be unique">idx <input name="idx" type="number" value="{{ suggested_idx }}"></label>
+
+  <label>Pack
+    <select name="pack_id" data-pack required>
+      {% for p in packs %}
+      <option value="{{ p.pack_id }}" data-name="{{ p.name }}"
+        {{ 'selected' if (f.get('pack_id') if f else default_pack_id) == p.pack_id }}>{{ p.name }} ({{ p.pack_id }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>pack_name <input name="pack_name" value="{{ v('pack_name') }}" list="packname-list" data-packname></label>
+  <label>name_en <input name="name_en" value="{{ v('name_en') }}" required data-namesrc></label>
+  <label>name_jp <input name="name_jp" value="{{ v('name_jp') }}"></label>
+  <label>artist (display) <input name="artist" value="{{ v('artist') }}"></label>
+  <label>bpm <input name="bpm" value="{{ v('bpm') }}" placeholder="120-180" data-bpm></label>
+  <label>bpm_base <input name="bpm_base" type="number" step="any" value="{{ v('bpm_base') }}" data-bpmbase></label>
+  <label>time <input name="time" value="{{ v('time') }}" placeholder="3:35 or 215" data-time></label>
+  <label>side
+    <select name="side">
+      {% for sid, label in side_choices() %}<option value="{{ sid }}">{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" name="world_unlock"> world_unlock</label>
+  <label class="check"><input type="checkbox" name="remote_download" checked> remote_download</label>
+  <label>bg <input name="bg" value="{{ v('bg') }}" list="bg-list"></label>
+  <label>date <input name="date" value="{{ v('date') }}" placeholder="unix seconds (paste seconds or ISO)" data-secdate></label>
+  <label>version <input name="version" value="{{ v('version') or latest_version }}" placeholder="4.7"></label>
+  {{ jacket_widget('jacket', v('jacket'), '') }}
+  <label>jacket_designer <input name="jacket_designer" value="{{ v('jacket_designer') }}"></label>
+
+  <div class="form-actions">
+    <button type="submit">Create</button>
+    <span class="dirty-badge" data-dirty hidden>● unsaved</span>
+  </div>
+</form>
+{% endblock %}

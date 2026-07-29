@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ tag.label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>
+    {{ tag.label }}
+    <span class="tag-chip chip-tint" style="{{ tag_chip_style(cat.color) }}">{{ tag.slug }}</span>
+  </h1>
+  <a href="/tags">← tags</a>
+</div>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <h2>Edit</h2>
+  <div class="form-row">
+    <form method="post" action="/tags/items/{{ tag.id }}">
+      <label>label <input name="label" value="{{ tag.label }}" required></label>
+      <label>category
+        <select name="category_id" required>
+          {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if c.id == tag.category_id }}>{{ c.label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>description
+        <input name="description" value="{{ tag.description or '' }}" placeholder="optional">
+      </label>
+      <button>Save</button>
+    </form>
+    <form method="post" action="/tags/items/{{ tag.id }}/delete" class="inline"
+          onsubmit="return confirm('Delete tag {{ tag.label }}? Removes it from every song/chart.')">
+      <button class="danger">Delete</button>
+    </form>
+  </div>
+  <p class="hint">slug <code>{{ tag.slug }}</code> is re-derived from the label on save.</p>
+</section>
+
+<section class="card">
+  <h2>Songs <span class="muted">({{ songs|length }})</span></h2>
+  <ul class="links">
+    {% for s in songs %}
+    <li><a href="/songs/{{ s.song_id }}#tags">{{ s.name_en }}</a> <code>{{ s.song_id }}</code></li>
+    {% else %}<li class="muted">No songs.</li>{% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Charts <span class="muted">({{ charts|length }})</span></h2>
+  <ul class="links">
+    {% for ch in charts %}
+    <li><a href="/songs/{{ ch.song_id }}#chart-{{ ch.id }}">{{ ch.name }}</a>
+      <span class="diff-chip diff-{{ ch.difficulty.value }}">{{ ch.difficulty.value | upper }}</span>
+      <code>{{ ch.song_id }}</code></li>
+    {% else %}<li class="muted">No charts.</li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

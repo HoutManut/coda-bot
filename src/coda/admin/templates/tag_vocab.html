@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Tags{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Tags</h1>
+  <button type="button" class="edit-toggle" data-tags-edit-toggle aria-pressed="false">Edit mode</button>
+</div>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<div class="tags-page" data-tags-page>
+
+  {# New category — only in edit mode. Dashed placeholder box stands in for the
+     color swatch; color comes from the picker (blank picker = auto-seed). #}
+  <section class="card edit-only newcat">
+    <form method="post" action="/tags/categories" class="inline newcat-form">
+      <label class="newcat-color" data-tip="category color">
+        <input name="color" type="color" value="#9bb7d4">
+      </label>
+      <input name="label" class="newcat-input" placeholder="new category label (e.g. Genre)" required>
+      <button>Add</button>
+    </form>
+  </section>
+
+  <div class="cat-list" data-cat-list>
+    {% for c in categories %}
+    <div class="card cat-card" data-cid="{{ c.id }}">
+      <div class="cat-head">
+        <span class="cat-handle edit-only" draggable="true" title="drag to reorder">⠿</span>
+        <button type="button" class="cat-toggle" data-cat-toggle aria-label="collapse">▾</button>
+
+        {# Color: static dot in view mode; a color picker (auto-submits) in edit. #}
+        <label class="cat-color edit-only" data-tip="category color">
+          <input type="color" value="{{ c.color or '#cccccc' }}"
+                 data-color-submit data-action="/tags/categories/{{ c.id }}">
+        </label>
+        <span class="cat-swatch view-only" style="background:{{ c.color or '#ccc' }}"></span>
+
+        {# Label + slug: static text in view mode; inline inputs in edit mode. #}
+        <span class="cat-label view-only">{{ c.label }}</span>
+        <code class="cat-slug view-only">{{ c.slug }}</code>
+
+        <form method="post" action="/tags/categories/{{ c.id }}" class="cat-inline edit-only"
+              data-inline-edit>
+          <input name="label" class="cat-edit cat-edit-label" value="{{ c.label }}"
+                 aria-label="category label" required>
+        </form>
+        <form method="post" action="/tags/categories/{{ c.id }}" class="cat-inline edit-only"
+              data-inline-edit>
+          <input name="slug" class="cat-edit cat-edit-slug" value="{{ c.slug }}"
+                 aria-label="category slug" required>
+        </form>
+
+        <span class="cat-count muted">{{ tags_by_cat.get(c.id, [])|length }}</span>
+
+        <form method="post" action="/tags/categories/{{ c.id }}/delete"
+              class="cat-del edit-only"
+              onsubmit="return confirm('Delete category {{ c.label }} and all its tags (and their assignments)?')">
+          <button class="danger small">Delete</button>
+        </form>
+      </div>
+
+      <div class="cat-body">
+        <div class="tag-pills" data-tag-pills data-cid="{{ c.id }}">
+          {% for item in tags_by_cat.get(c.id, []) %}
+          {% set t = item.tag %}
+          <span class="tag-pill chip-tint" style="{{ tag_chip_style(c.color) }}"
+                data-tid="{{ t.id }}" data-no-toggle>
+            {# View mode: whole pill links to the detail page ("show more"). #}
+            <a class="pill-link view-only" href="/tags/{{ t.id }}" data-tip="{{ t.label }}">
+              {{ t.slug }} <span class="muted">{{ item.uses }}</span>
+            </a>
+            {# Edit mode: draggable, inline-editable label + ✕ delete (on hover). #}
+            <span class="pill-edit edit-only" draggable="true">
+              <form method="post" action="/tags/items/{{ t.id }}/relabel"
+                    class="pill-inline" data-inline-edit>
+                <input name="label" class="pill-edit-input" value="{{ t.label }}"
+                       aria-label="tag label" draggable="false" required>
+              </form>
+              <form method="post" action="/tags/items/{{ t.id }}/delete" class="pill-del"
+                    onsubmit="return confirm('Delete tag {{ t.label }}? Removes it from {{ item.uses }} song(s)/chart(s).')">
+                <button class="link" title="delete tag" draggable="false">✕</button>
+              </form>
+            </span>
+          </span>
+          {% endfor %}
+
+          {# Add-tag box: always visible, tinted + muted, last in the row. Click
+             the box to swap it for the input. #}
+          <form method="post" action="/tags/items" class="tag-add"
+                style="{{ tag_chip_style(c.color) }}" data-tag-add>
+            <input type="hidden" name="category_id" value="{{ c.id }}">
+            <input name="label" class="tag-add-input" placeholder="tag…"
+                   autocomplete="off" required hidden>
+            <button type="button" class="tag-add-btn" data-tag-add-btn>+ add</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">No categories yet — turn on edit mode to add one.</p>
+    {% endfor %}
+  </div>
+
+  {# Hidden form the drag-reorder submits (comma-joined category ids). #}
+  <form method="post" action="/tags/categories/reorder" data-reorder-form hidden>
+    <input type="hidden" name="order" data-reorder-input>
+  </form>
+
+  {# Hidden form a pill drag-to-category submits (action set to the tag at drop). #}
+  <form method="post" data-move-form hidden>
+    <input type="hidden" name="category_id" data-move-cat>
+  </form>
+</div>
+{% endblock %}

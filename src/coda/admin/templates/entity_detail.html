@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ entity.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ entity.name }} <code>{{ eid }}</code></h1>
+  <a href="/{{ kind }}">← {{ kind }}</a>
+</div>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <h2>Edit</h2>
+  <div class="form-row">
+    <form method="post" action="/{{ kind }}/{{ eid }}">
+      <label>name <input name="name" value="{{ entity.name }}" required></label>
+      {% if has_kind %}
+      <label class="inline" title="A unit/band.">
+        <input type="checkbox" name="kind" value="unit" {{ 'checked' if entity.kind.value == 'unit' }}> unit
+      </label>
+      {% endif %}
+      <button>Save</button>
+    </form>
+    <form method="post" action="/{{ kind }}/{{ eid }}/delete" class="inline"
+          onsubmit="return confirm('Delete {{ eid }}? Song links and aliases go too.')">
+      <button class="danger">Delete</button>
+    </form>
+  </div>
+  <hr class="divider">
+  <form method="post" action="/{{ kind }}/{{ eid }}/rename" class="inline"
+        onsubmit="return confirm('Rename {{ kind[:-1] }} id? All song links and aliases follow automatically.')">
+    <label>{{ id_col }} (primary key)
+      <input name="new_id" value="{{ eid }}" pattern=".*\S.*" required>
+    </label>
+    <button class="small">Rename id</button>
+    <span class="hint">Changing the id cascades to every song link and alias.</span>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Aliases</h2>
+  <ul class="aliases">
+    {% for a in aliases %}
+    <li>
+      <span class="alias {{ 'auto' if a.alias in auto_terms }}">{{ a.alias }}</span>
+      {% if a.alias in auto_terms %}<span class="badge">auto</span>{% endif %}
+      <form method="post" action="/aliases/{{ kind[:-1] }}/{{ eid }}/remove" class="inline">
+        <input type="hidden" name="alias" value="{{ a.alias }}">
+        <button class="link">✕</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="/aliases/{{ kind[:-1] }}/{{ eid }}/add" class="inline">
+    <input name="alias" placeholder="add alias…" required><button>Add</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Merge <span class="muted">(destructive)</span></h2>
+  <p class="muted">Repoints this {{ kind[:-1] }}'s song links onto the target, keeps
+    <code>{{ eid }}</code> + its aliases searchable on the target, then deletes this row.</p>
+  <form method="post" action="/{{ kind }}/{{ eid }}/merge" class="inline"
+        onsubmit="return confirm('Merge {{ eid }} into the selected target? Not reversible.')">
+    <select name="target" required>
+      <option value="">— merge into —</option>
+      {% for o in others %}<option value="{{ o[id_col] }}">{{ o.name }} ({{ o[id_col] }})</option>{% endfor %}
+    </select>
+    <button class="danger">Merge</button>
+  </form>
+</section>
+
+{% if has_kind and entity.kind.value == 'unit' %}
+<section class="card" id="members">
+  <h2>Members <span class="muted">({{ members|length }})</span></h2>
+  <p class="muted">Artists this unit is composed of. Each links to its own page.</p>
+  <ul class="links">
+    {% for m in members %}
+    <li>
+      <a href="/artists/{{ m.artist_id }}">{{ m.name }}</a> <code>{{ m.artist_id }}</code>
+      <form method="post" action="/artists/{{ eid }}/members/{{ m.artist_id }}/unlink" class="inline">
+        <button class="link">✕</button>
+      </form>
+    </li>
+    {% else %}<li class="muted">No members linked.</li>{% endfor %}
+  </ul>
+  <form method="post" action="/artists/{{ eid }}/members" class="inline">
+    <select name="id" required>
+      <option value="">— add member —</option>
+      {% for o in others %}<option value="{{ o[id_col] }}">{{ o.name }} ({{ o[id_col] }})</option>{% endfor %}
+    </select>
+    <button>Add</button>
+  </form>
+</section>
+{% endif %}
+
+{% if has_kind and part_of %}
+<section class="card" id="part-of">
+  <h2>Part of <span class="muted">({{ part_of|length }})</span></h2>
+  <p class="muted">Units this artist is a member of.</p>
+  <ul class="links">
+    {% for u in part_of %}
+    <li>
+      <a href="/artists/{{ u.artist_id }}">{{ u.name }}</a> <code>{{ u.artist_id }}</code>
+      <form method="post" action="/artists/{{ u.artist_id }}/members/{{ eid }}/unlink" class="inline">
+        <button class="link">✕</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card">
+  {% set count = responsible_songs|length if kind == 'charters' else entries|length %}
+  <div class="card-head">
+    <h2>Songs <span class="muted">({{ count }})</span></h2>
+    {% if count %}
+    <div class="sort-toggle" data-sort-songs>
+      <button type="button" data-key="idx" class="active">idx</button>
+      <button type="button" data-key="name">name</button>
+      <button type="button" data-key="date">date</button>
+    </div>
+    {% endif %}
+  </div>
+  {% if kind == 'charters' %}
+  <ul class="links" data-sortable data-merge>
+    {% for s in responsible_songs %}<li data-idx="{{ s.idx }}" data-name="{{ s.name|lower }}" data-date="{{ s.date }}" data-song="{{ s.song_id }}" data-total="{{ s.total }}"><a href="/songs/{{ s.song_id }}">{{ s.name }}</a> <code>{{ s.song_id }}</code>
+      {% for d in s.diffs %}<span class="diff-chip diff-{{ d.value }}" data-ord="{{ d.ordinal if d.ordinal is not none else 99 }}">{{ d.value | upper }}</span>{% endfor %}</li>
+    {% else %}<li class="muted">No charts.</li>{% endfor %}
+  </ul>
+  {% else %}
+  <ul class="links" data-sortable>
+    {% for e in entries %}<li data-idx="{{ e.idx }}" data-name="{{ e.name|lower }}" data-date="{{ e.date }}"><a href="/songs/{{ e.song_id }}{% if e.difficulty_id %}#chart-{{ e.difficulty_id }}{% endif %}">{{ e.name }}</a>
+      {% if e.difficulty %}<span class="diff-chip diff-{{ e.difficulty.value }}">{{ e.difficulty.value | upper }}</span>{% endif %}
+      <code>{{ e.song_id }}</code>{% if e.note %} <span class="muted">({{ e.note }})</span>{% endif %}</li>
+    {% else %}<li class="muted">No songs.</li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}

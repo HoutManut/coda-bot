@@ -1,0 +1,478 @@
+/* Coda Catalog Admin — minimal, light, editorial.
+   Display: Fraunces · Body: DM Sans · Mono: JetBrains Mono. */
+
+:root {
+  --bg: #fcfcfb;
+  --surface: #ffffff;
+  --ink: #1c1b19;
+  --muted: #6b6862;
+  --faint: #9b978f;
+  --line: #e8e6e1;
+  --line-strong: #d8d5ce;
+  --accent: #2f6f4f;        /* muted forest green */
+  --accent-soft: #2f6f4f14;
+  --danger: #b3402f;
+  --radius: 8px;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 400 14.5px/1.6 "DM Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- header ------------------------------------------------------------ */
+header {
+  position: sticky; top: 0; z-index: 10;
+  background: #fcfcfbe6; backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.bar {
+  max-width: 940px; margin: 0 auto; padding: .85rem 1.5rem;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+}
+.brand {
+  font-family: "Fraunces", serif; font-weight: 600; font-size: 1.25rem;
+  color: var(--ink); text-decoration: none; letter-spacing: -.01em;
+}
+.brand .dim { color: var(--faint); font-weight: 500; margin-left: .35rem; font-size: .95rem; }
+nav { display: flex; gap: 1.3rem; }
+nav a {
+  color: var(--muted); text-decoration: none; font-weight: 500; font-size: .9rem;
+  padding-bottom: 2px; border-bottom: 1.5px solid transparent; transition: .15s;
+}
+nav a:hover { color: var(--ink); border-color: var(--ink); }
+
+main { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem; }
+
+/* --- type -------------------------------------------------------------- */
+h1 {
+  font-family: "Fraunces", serif; font-weight: 600; font-size: 1.7rem;
+  letter-spacing: -.015em; margin: 0;
+  display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap;
+}
+h2 {
+  font-family: "Fraunces", serif; font-weight: 600; font-size: 1.05rem;
+  margin: 0 0 1rem; display: flex; align-items: baseline; gap: .5rem;
+}
+.muted { color: var(--muted); font-weight: 400; }
+.hint { color: var(--faint); font-size: .8rem; margin: .15rem 0 0; }
+.page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+}
+code, .mono {
+  font-family: var(--mono); font-size: .82em; color: #2f6f4f;
+  background: var(--accent-soft); padding: .1em .4em; border-radius: 4px;
+}
+
+/* --- cards / forms ----------------------------------------------------- */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 1.3rem 1.4rem; margin: 1.2rem 0;
+}
+.card.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+@media (max-width: 700px) { .card.cols { grid-template-columns: 1fr; } }
+/* Keep the two link columns visually identical regardless of option text width. */
+.card.cols > div { min-width: 0; }
+.card.cols form.inline { width: 100%; }
+.card.cols form.inline select { flex: 1 1 auto; min-width: 0; }
+
+form { display: flex; flex-wrap: wrap; gap: 1rem 1.2rem; align-items: flex-end; }
+/* Bottom-align so a button/hint lines up with the input row, not a stacked
+   label's caption (the rename row has a two-line label). */
+form.inline { align-items: flex-end; gap: .6rem; }
+/* Lay sibling forms (e.g. Save + Delete) on one bottom-aligned row. */
+.form-row { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: flex-end; }
+label {
+  display: flex; flex-direction: column; gap: .3rem;
+  font-size: .72rem; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--muted);
+}
+label.check {
+  flex-direction: row; align-items: center; gap: .5rem;
+  text-transform: none; letter-spacing: 0; color: var(--ink); font-weight: 500;
+}
+
+input, select {
+  background: var(--surface); border: 1px solid var(--line-strong); color: var(--ink);
+  padding: .5rem .6rem; border-radius: 6px; font: inherit; min-width: 13ch;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* Inside a chart, focus + drop highlights adopt that difficulty's tint. */
+.chart input:focus, .chart select:focus {
+  border-color: var(--c);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent);
+}
+.chart .jacket-drop:hover, .chart .jacket-drop:focus, .chart .jacket-drop.over {
+  border-color: var(--c);
+}
+.chart .jacket-drop.over { background: color-mix(in srgb, var(--c) 12%, transparent); }
+input::placeholder { color: var(--faint); }
+input:disabled { background: #f5f4f1; color: var(--faint); }
+input[type=checkbox] { min-width: 0; width: 16px; height: 16px; accent-color: var(--accent); }
+input[type=search] { width: 100%; margin: 0 0 1.25rem; }
+
+/* Buttons size from padding + the body line-height so their box matches the
+   adjacent inputs/text on a shared baseline (no fixed height fighting input
+   intrinsic height — that's what floated buttons above their neighbours). */
+button {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ink); color: #fff; border: 1px solid var(--ink);
+  padding: .5rem 1.05rem; line-height: 1.6; border-radius: 6px;
+  font: inherit; font-weight: 600; cursor: pointer; transition: .15s;
+}
+button:hover { background: #000; }
+button.danger { background: var(--surface); color: var(--danger); border-color: #e0b6af; }
+button.danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+/* Icon-only borderless buttons (chip ✕) keep their own compact box. */
+button.link { background: none; border: 0; color: var(--faint); padding: 0 .35rem; font-weight: 700; }
+button.link:hover { color: var(--danger); }
+button.small { padding: .32rem .75rem; font-size: .82rem; line-height: 1.4; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ink); color: #fff; padding: .5rem 1.05rem; line-height: 1.6;
+  border-radius: 6px; text-decoration: none; font-weight: 600; font-size: .9rem;
+}
+.btn:hover { background: #000; }
+
+/* Save button + its unsaved badge, bottom-aligned with the form's input row. */
+.form-actions { display: flex; align-items: center; gap: .7rem; }
+.dirty-badge {
+  color: var(--danger); font-size: .78rem; font-weight: 600; letter-spacing: .02em;
+}
+form.dirty > button[type=submit],
+form.dirty .form-actions > button[type=submit] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+/* --- tables ------------------------------------------------------------ */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; border-bottom: 1px solid var(--line-strong); }
+th a.sort {
+  display: block; padding: .5rem .7rem; color: var(--muted); text-decoration: none;
+  font-family: "DM Sans", sans-serif; font-size: .72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em; transition: color .12s;
+}
+th a.sort:hover { color: var(--ink); }
+th a.sort.active { color: var(--accent); }
+td { padding: .6rem .7rem; border-bottom: 1px solid var(--line); }
+tbody tr { cursor: pointer; transition: background .12s; }
+tbody tr:hover { background: #f6f5f2; }
+
+/* --- pager ------------------------------------------------------------- */
+.pager {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; margin: .25rem 0 .5rem; font-size: .85rem; color: var(--muted);
+}
+.pager .pages { display: flex; align-items: center; gap: 1rem; }
+.pager a { color: var(--ink); text-decoration: none; font-weight: 600; }
+.pager a:hover { color: var(--accent); }
+.pager .off { color: var(--faint); opacity: .5; }
+.pager .cur { font-variant-numeric: tabular-nums; }
+
+/* --- alerts ------------------------------------------------------------ */
+.error {
+  background: #fbeeec; border: 1px solid #e6c3bc; color: #8f2f22;
+  padding: .7rem .9rem; border-radius: 6px; margin-bottom: 1rem; font-weight: 500;
+}
+.notice {
+  background: var(--accent-soft); border: 1px solid #a7cdb8; color: var(--accent);
+  padding: .7rem .9rem; border-radius: 6px; margin-bottom: 1rem; font-weight: 500;
+}
+.danger-zone { border-color: #e6c3bc; }
+.danger-zone h2 { color: var(--danger); }
+
+/* --- charts (difficulty accordions) ----------------------------------- */
+details.chart {
+  --c: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line));
+  border-left: 4px solid var(--c);
+  border-radius: 6px; padding: .6rem .95rem; margin: .55rem 0;
+  background: color-mix(in srgb, var(--c) 12%, var(--surface));
+}
+details.chart[open] { background: color-mix(in srgb, var(--c) 8%, var(--surface)); }
+details.chart > summary {
+  cursor: pointer; font-weight: 600; list-style: none;
+  display: flex; align-items: center; gap: .7rem;
+}
+details.chart > summary::-webkit-details-marker { display: none; }
+details.chart > form { padding-top: .6rem; }
+details.chart > summary::before {
+  content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); flex: none;
+}
+details.chart.add { --c: var(--line-strong); border-style: dashed; }
+details.overrides { width: 100%; margin: .3rem 0; }
+details.overrides > summary { cursor: pointer; color: var(--muted); font-size: .82rem; }
+
+/* Per-chart links + aliases, collapsed by default under one disclosure. */
+details.diff-extras { margin: .6rem 0 .2rem; border-top: 1px dashed var(--line-strong); padding-top: .55rem; }
+details.diff-extras > summary { cursor: pointer; color: var(--muted); font-size: .82rem; font-weight: 600; }
+/* Already inside the disclosure — drop the standalone top borders/leading gap. */
+details.diff-extras .diff-links,
+details.diff-extras .diff-aliases { border-top: 0; padding-top: 0; margin: .7rem 0 0; }
+
+details.diff-tags > summary { cursor: pointer; color: var(--muted); font-size: .82rem; font-weight: 600; }
+/* Tints from the in-game difficulty palette, desaturated to sit on the light UI. */
+/* Scoped to .chart so they outrank `details.chart { --c }` specificity. */
+.chart.diff-pst   { --c: #5a93c4; }  /* Past — blue */
+.chart.diff-prs   { --c: #90ac52; }  /* Present — green */
+.chart.diff-ftr   { --c: #b15a9b; }  /* Future — magenta */
+.chart.diff-etr   { --c: #8f7bbf; }  /* Eternal — lavender */
+.chart.diff-byd   { --c: #b3564c; }  /* Beyond — red-brown */
+.chart.diff-byd_2 { --c: #c06a3e; }  /* Beyond 2 — deep orange */
+.chart.diff-err   { --c: #c44fa6; }  /* Error — bright magenta */
+
+/* Song-list header: title left, sort toggle right. */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.card-head h2 { margin: 0; }
+.sort-toggle { display: inline-flex; gap: .15rem; }
+.sort-toggle button {
+  font-size: .72rem; font-family: var(--mono); padding: .12rem .5rem;
+  border: 1px solid var(--line-strong); background: transparent; color: var(--muted);
+  cursor: pointer; border-radius: 5px;
+}
+.sort-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Filled difficulty chips (entity song lists). Same palette as the accordions. */
+.diff-chip {
+  display: inline-block; vertical-align: middle;
+  font-size: .6rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--c, var(--muted));
+  background: color-mix(in srgb, var(--c, var(--muted)) 14%, transparent);
+  border-radius: 5px; padding: .08rem .4rem;
+}
+.diff-chip.diff-pst   { --c: #5a93c4; }
+.diff-chip.diff-prs   { --c: #90ac52; }
+.diff-chip.diff-ftr   { --c: #b15a9b; }
+.diff-chip.diff-etr   { --c: #8f7bbf; }
+.diff-chip.diff-byd   { --c: #b3564c; }
+.diff-chip.diff-byd_2 { --c: #c06a3e; }
+.diff-chip.diff-err   { --c: #c44fa6; }
+
+.chart-stat { color: var(--muted); font-weight: 400; font-family: var(--mono); font-size: .8rem; }
+
+/* --- aliases / link chips --------------------------------------------- */
+ul.aliases, ul.links { list-style: none; padding: 0; margin: .4rem 0; }
+ul.aliases { display: flex; flex-wrap: wrap; gap: .5rem; }
+ul.aliases li {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--bg); border: 1px solid var(--line-strong); border-radius: 16px;
+  padding: .2rem .35rem .2rem .7rem; font-size: .85rem;
+}
+ul.aliases li:has(.alias.auto) { border-color: #a7cdb8; background: var(--accent-soft); }
+.badge {
+  font-size: .6rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  background: var(--accent); color: #fff; border-radius: 5px; padding: .08rem .4rem;
+}
+.alias.auto { color: var(--accent); }
+.diff-aliases { width: 100%; margin: .6rem 0 0rem 0; border-top: 1px dashed var(--line-strong); padding-top: .6rem; }
+.diff-aliases h3, .diff-links h3 { font-family: "Fraunces", serif; font-weight: 600; font-size: .9rem; margin: 0 0 .4rem; }
+.diff-links { width: 100%; margin: .6rem 0 .2rem; border-top: 1px dashed var(--line-strong); padding-top: .6rem; }
+.diff-links .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+.diff-links .cols > div { min-width: 0; }
+@media (max-width: 700px) { .diff-links .cols { grid-template-columns: 1fr; } }
+.link-head { font-family: "DM Sans", sans-serif; font-weight: 600; font-size: .72rem;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: .4rem 0 0 0; }
+.inherit-note { font-size: .82rem; margin: .3rem 0; }
+ul.links { display: flex; flex-direction: column; gap: .3rem; }
+ul.links li { display: flex; align-items: center; gap: .5rem; padding: .2rem 0; }
+ul.links a { color: var(--ink); text-decoration: none; font-weight: 500; }
+ul.links a:hover { color: var(--accent); }
+
+/* --- tags (chips like aliases, but a tag spans many songs) ------------- */
+ul.tags { list-style: none; padding: 0; margin: .4rem 0; display: flex; flex-wrap: wrap; gap: .5rem; }
+ul.tags li {
+  display: inline-flex; align-items: center; gap: .35rem;
+  /* --cbg/--cbd/--cfg come from presenters.tag_chip_style (category tint, with
+     a luminance-derived text color); fall back to the neutral pill if absent. */
+  background: var(--cbg, var(--bg));
+  border: 1px solid var(--cbd, var(--line-strong));
+  color: var(--cfg, inherit);
+  border-radius: 16px;
+  padding: .2rem .35rem .2rem .7rem; font-size: .85rem; font-weight: 500;
+}
+ul.tags li .link { color: var(--cfg, inherit); opacity: .65; }
+ul.tags li .link:hover { opacity: 1; }
+.tag-chip { font-weight: 500; }
+.tag-newcat { display: inline-flex; }
+/* standalone tinted chip (vocab list) — same tint vars as ul.tags li */
+.chip-tint { display: inline-block; border-radius: 12px; padding: .05rem .55rem;
+  background: var(--cbg, var(--bg)); border: 1px solid var(--cbd, var(--line-strong));
+  color: var(--cfg, inherit); }
+
+/* --- floating tag picker panel ----------------------------------------- */
+.tag-panel {
+  position: fixed; z-index: 60; max-height: 22rem; overflow-y: auto;
+  min-width: 16rem; max-width: 26rem; padding: .35rem;
+  background: var(--surface, #fff); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: 0 6px 24px #0002;
+}
+.tag-grp-head {
+  display: flex; align-items: center; justify-content: flex-start; gap: .35rem;
+  width: 100%; text-align: left;
+  background: none; border: 0; box-shadow: none; cursor: pointer;
+  padding: .55rem .35rem .3rem; color: var(--muted);
+  font: 600 .82rem/1 "DM Sans", sans-serif; letter-spacing: .04em; text-transform: uppercase;
+}
+/* keep it flat on hover — the global button:hover paints bg black, which would
+   swallow the muted label text. Only deepen the text color. */
+.tag-grp-head:hover { background: none; color: var(--ink); }
+.tag-grp-head .caret { transition: transform .12s; font-size: .7rem; }
+.tag-grp:not(.collapsed) .tag-grp-head .caret,
+.tag-grp.searching .tag-grp-head .caret { transform: rotate(90deg); }
+.tag-grp-list { list-style: none; margin: 0 0 .25rem; padding: 0 .2rem;
+  display: flex; flex-wrap: wrap; gap: .3rem; }
+.tag-grp.collapsed:not(.searching) .tag-grp-list { display: none; }
+.tag-opt { cursor: pointer; font-size: .82rem; }
+.tag-opt:hover { filter: brightness(.95); outline: 2px solid var(--cbd, var(--accent)); }
+.tag-panel-empty { padding: .4rem .5rem; margin: 0; font-size: .82rem; }
+.diff-tags { width: 100%; margin: .4rem 0 0; padding-top: .6rem; }
+.diff-tags h3 { font-family: "Fraunces", serif; font-weight: 600; font-size: .9rem; margin: 0 0 .4rem; }
+.cat-swatch { display: inline-block; width: .8em; height: .8em; border-radius: 3px;
+  border: 1px solid var(--line-strong); vertical-align: baseline; margin-right: .35rem; }
+
+/* === tag vocabulary page ============================================== */
+/* Edit mode is a body-less class on the page container toggled by the header
+   button: .editing reveals .edit-only affordances and hides .view-only ones. */
+.edit-only { display: none !important; }
+.tags-page.editing .edit-only { display: revert !important; }
+.tags-page.editing .view-only { display: none !important; }
+/* Re-assert flex/inline layouts the blanket `revert` above can't recover. */
+.tags-page.editing .newcat-form.edit-only,
+.tags-page.editing .cat-inline.edit-only,
+.tags-page.editing .pill-edit.edit-only,
+.tags-page.editing .tag-add.edit-only { display: inline-flex !important; }
+
+.edit-toggle { font-size: .82rem; }
+.tags-page.editing .edit-toggle,
+.edit-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* New-category card: dashed placeholder box in place of the color swatch. */
+.newcat-form { align-items: center; gap: .6rem; }
+.newcat-input { border-color: transparent; background: transparent; padding: .25rem .4rem; }
+.newcat-input:hover { border-color: var(--line); }
+.newcat-input:focus { border-color: var(--accent); background: var(--surface); }
+.newcat-color input[type="color"], .cat-color input[type="color"] {
+  -webkit-appearance: none; appearance: none; border: 1px solid var(--line-strong);
+  border-radius: 5px; min-width: 0; width: 2rem; height: 2rem; padding: 2px; cursor: pointer; }
+.newcat-color input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.newcat-color input[type="color"]::-webkit-color-swatch,
+.cat-color input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
+
+.cat-list { display: flex; flex-direction: column; gap: .6rem; }
+.cat-card { padding: 0; }
+.cat-card.dragging { opacity: .4; }
+.cat-card.collapsed .cat-body { display: none; }
+.cat-card.collapsed .cat-toggle { transform: rotate(-90deg); }
+.cat-head { display: flex; align-items: center; gap: .5rem; padding: .8rem 1.1rem; }
+.cat-toggle { background: none; border: 0; box-shadow: none; cursor: pointer;
+  font-size: 1.1rem; line-height: 1; color: var(--muted); padding: .2rem .35rem;
+  flex: 0 0 auto; transition: transform .12s; }
+.cat-toggle:hover { background: none; color: var(--ink); }
+.cat-handle { cursor: grab; color: var(--faint); font-size: 1rem; line-height: 1; user-select: none; }
+.cat-handle:active { cursor: grabbing; }
+.cat-color { display: inline-flex; align-items: center; }
+.cat-label { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.15rem; }
+.cat-slug { color: var(--muted); }
+.cat-count { margin-left: auto; font-family: var(--mono); font-size: .8rem; }
+.cat-del { margin-left: .5rem; }
+
+/* Inline header edits: inputs read like the static header text and hug their
+   content (field-sizing) instead of inheriting the global min-width. */
+.cat-inline { display: inline-flex; margin: 0; }
+.cat-edit { border: 1px solid transparent; background: transparent; border-radius: 5px;
+  padding: .1rem .3rem; font: inherit; min-width: 2ch; field-sizing: content; }
+.cat-edit:hover { border-color: var(--line); }
+.cat-edit:focus { border-color: var(--accent); background: var(--surface); outline: none; box-shadow: none; }
+.cat-edit-label { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.15rem; }
+.cat-edit-slug { font-family: var(--mono); font-size: .85rem; color: var(--muted); }
+
+.cat-body { padding: 0 1.1rem 1rem; }
+
+/* Pills: wrap, tinted text via --cink. */
+.tag-pills { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+.tag-pills.drop-target { outline: 2px dashed var(--accent); outline-offset: 3px; border-radius: 8px; }
+.tag-pill { position: relative; display: inline-flex; align-items: center; padding: 0; }
+.tag-pill .pill-link { color: var(--cink, var(--ink)); text-decoration: none;
+  padding: .1rem .6rem; display: inline-block; }
+.tag-pill .pill-link:hover { filter: brightness(.92); }
+.tag-pill .pill-link .muted { color: var(--cink, var(--muted)); opacity: .6; }
+.tag-pill.dragging { opacity: .4; }
+.pill-edit { align-items: center; cursor: grab; padding: .05rem .35rem .05rem .5rem; }
+.pill-edit:active { cursor: grabbing; }
+.pill-inline { display: inline-flex; margin: 0; }
+.pill-edit-input { border: 1px solid transparent; background: transparent; color: var(--cink, var(--ink));
+  border-radius: 5px; padding: .05rem .25rem; font: inherit; font-size: .85rem;
+  min-width: 2ch; field-sizing: content; }
+.pill-edit-input:hover { border-color: var(--cbd, var(--line)); }
+.pill-edit-input:focus { border-color: var(--cink, var(--accent)); background: #fff8; outline: none; box-shadow: none; }
+/* ✕ delete: hidden until the pill is hovered, pinned top-right. */
+.pill-del { margin: 0; }
+.pill-del .link { position: absolute; top: -.5rem; right: -.5rem; display: none;
+  width: 1.1rem; height: 1.1rem; padding: 0; border-radius: 50%; line-height: 1;
+  font-size: .7rem; background: var(--danger); color: #fff; border: 1px solid #fff; }
+.tag-pill:hover .pill-del .link { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Add-tag: a tinted, muted box at the end of the pill row (all modes). Click
+   swaps the box for an input. Tint vars come from the form's style attr. */
+.tag-add { margin: 0; padding: 0; background: none; border: 0;
+  display: inline-flex; align-items: center; }
+.tag-add-btn { background: var(--cbg, var(--bg)); border: 1px dashed var(--cbd, var(--line-strong));
+  color: var(--cink, var(--muted)); opacity: .6; border-radius: 12px;
+  padding: .1rem .6rem; font: inherit; font-size: .85rem; cursor: pointer; }
+.tag-add-btn:hover { opacity: 1; background: var(--cbg, var(--bg)); color: var(--cink, var(--muted)); }
+.tag-add-input { border: 1px solid var(--cbd, var(--line-strong)); background: var(--cbg, var(--surface));
+  color: var(--cink, var(--ink)); border-radius: 12px; padding: .1rem .5rem;
+  font: inherit; font-size: .85rem; min-width: 4ch; field-sizing: content; }
+.tag-add-input::placeholder { color: var(--cink, var(--faint)); opacity: .6; }
+.tag-add-input:focus { outline: none; box-shadow: none; border-color: var(--cink, var(--cbd)); }
+
+.divider { border: 0; border-top: 1px dashed var(--line-strong); margin: 1.1rem 0; }
+
+/* --- hover/focus tooltip (replaces flaky native title) ----------------- */
+/* Put data-tip on the wrapping label; it shows on hover OR keyboard focus,
+   instantly, with no native-title delay. Empty data-tip shows nothing. */
+[data-tip] { position: relative; }
+[data-tip]:not([data-tip=""]):hover::after,
+[data-tip]:not([data-tip=""]):focus-within::after {
+  content: attr(data-tip);
+  position: absolute; left: 0; top: calc(100% + 4px); z-index: 30;
+  padding: .3rem .5rem; border-radius: 5px;
+  background: var(--ink); color: #fff;
+  font: 500 .72rem/1.3 "DM Sans", sans-serif;
+  text-transform: none; letter-spacing: 0; white-space: nowrap;
+  pointer-events: none; box-shadow: 0 2px 8px #0002;
+}
+
+/* --- jacket widget ----------------------------------------------------- */
+.jacket {
+  display: flex; gap: .9rem; align-items: flex-start;
+  border: 1px solid var(--line); border-radius: 8px; padding: .7rem .8rem;
+  background: var(--bg); width: 100%;
+}
+.jacket-thumb {
+  width: 88px; height: 88px; flex: none; object-fit: cover;
+  border-radius: 6px; border: 1px solid var(--line-strong); background: #f0efeb;
+}
+.jacket-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .5rem; }
+.jacket-body > label { gap: .25rem; }
+.jacket-body .jacket-input { width: 100%; }
+.jacket-drop {
+  border: 1.5px dashed var(--line-strong); border-radius: 6px;
+  padding: .55rem .7rem; text-align: center; color: var(--muted);
+  font-size: .82rem; cursor: pointer; transition: .15s;
+}
+.jacket-drop:hover, .jacket-drop:focus { border-color: var(--accent); color: var(--ink); outline: none; }
+.jacket-drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.jacket-drop code { font-size: .9em; }
+.jacket-url { display: flex; gap: .5rem; }
+.jacket-url-input { flex: 1 1 auto; min-width: 0; }
+.jacket-status { min-height: 1em; }

@@ -1,0 +1,39 @@
+{# Jacket field: stem text input + preview + drop-zone / URL upload.
+   default_stem is what the file is named if the field is left blank. #}
+{% macro jacket_widget(name, value, default_stem) %}
+<div class="jacket" data-default="{{ default_stem }}">
+  <img class="jacket-thumb" alt="jacket preview"
+       {% if value %}src="/jacket-img/{{ value }}.jpg"{% else %}style="display:none"{% endif %}>
+  <div class="jacket-body">
+    <label>{{ name }}
+      <input name="{{ name }}" class="jacket-input" value="{{ value }}" placeholder="{{ default_stem }}">
+    </label>
+    <div class="jacket-drop" tabindex="0">Drop image or click to choose · names it <code>{{ default_stem }}.jpg</code></div>
+    <input type="file" class="jacket-file" accept="image/*" hidden>
+    <div class="jacket-url">
+      <input type="url" class="jacket-url-input" placeholder="…or paste image URL">
+      <button type="button" class="jacket-url-btn small">Fetch</button>
+    </div>
+    <span class="jacket-status hint"></span>
+  </div>
+</div>
+{% endmacro %}
+
+{# Sortable header cell. Re-clicking the active column flips direction. #}
+{% macro sort_th(page, label, key) %}
+<th><a class="sort{{ ' active' if page.sort == key }}" href="{{ page.url(sort=key) }}">{{ label }}{{ page.arrow(key) }}</a></th>
+{% endmacro %}
+
+{# Page window summary + prev/next. #}
+{% macro pager(page) %}
+<div class="pager">
+  <span class="count">{{ page.start }}–{{ page.end }} of {{ page.total }}</span>
+  <span class="pages">
+    {% if page.has_prev %}<a href="{{ page.url(page=page.page - 1) }}">← Prev</a>
+    {% else %}<span class="off">← Prev</span>{% endif %}
+    <span class="cur">{{ page.page }} / {{ page.pages }}</span>
+    {% if page.has_next %}<a href="{{ page.url(page=page.page + 1) }}">Next →</a>
+    {% else %}<span class="off">Next →</span>{% endif %}
+  </span>
+</div>
+{% endmacro %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ pack.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ pack.name }} <code>{{ pack.pack_id }}</code></h1>
+  <a href="/packs">← packs</a>
+</div>
+
+<section class="card">
+  <form method="post" action="/packs/{{ pack.pack_id }}">
+    <label>name <input name="name" value="{{ pack.name }}" required></label>
+    <label>description <input name="description" value="{{ pack.description or '' }}"></label>
+    <label>cover_art <input name="cover_art" value="{{ pack.cover_art or '' }}"></label>
+    <label>release_date <input name="release_date" type="date" value="{{ release_date_str }}"></label>
+    <button>Save</button>
+  </form>
+  <form method="post" action="/packs/{{ pack.pack_id }}/delete" class="inline"
+        onsubmit="return confirm('Delete pack? Songs keep their pack_name but lose the pack_id link.')">
+    <button class="danger">Delete pack</button>
+  </form>
+  <hr class="divider">
+  <form method="post" action="/packs/{{ pack.pack_id }}/rename" class="inline"
+        onsubmit="return confirm('Rename pack_id? Every song in this pack follows automatically.')">
+    <label>pack_id (primary key)
+      <input name="new_id" value="{{ pack.pack_id }}" pattern="\S+" required>
+    </label>
+    <button class="small">Rename id</button>
+    <span class="hint">Changing the id cascades to every song in this pack.</span>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Songs in pack <span class="muted">({{ songs|length }})</span></h2>
+  <ul class="links">
+    {% for s in songs %}<li><a href="/songs/{{ s.song_id }}">{{ s.name_en }}</a> <code>{{ s.song_id }}</code></li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

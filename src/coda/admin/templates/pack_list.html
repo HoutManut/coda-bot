@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sort_th, pager %}
+{% block title %}Packs{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Packs</h1></div>
+
+<form method="get" action="/packs" class="inline">
+  <input type="search" name="q" value="{{ page.q }}" placeholder="Search packs…"><button>Search</button>
+</form>
+
+{{ pager(page) }}
+<table>
+  <thead><tr>
+    {{ sort_th(page, 'pack_id', 'pack_id') }}
+    {{ sort_th(page, 'Name', 'name') }}
+  </tr></thead>
+  <tbody>
+    {% for r in page.items %}
+    <tr onclick="location='/packs/{{ r.pack_id }}'"><td><code>{{ r.pack_id }}</code></td><td>{{ r.name }}</td></tr>
+    {% else %}<tr><td colspan="2" class="muted">None.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{{ pager(page) }}
+
+<form method="post" action="/packs" class="card inline">
+  <h2>New pack</h2>
+  <input name="pack_id" placeholder="pack_id" required>
+  <input name="name" placeholder="name" required>
+  <button>Create</button>
+</form>
+{% endblock %}

@@ -1,0 +1,36 @@
+/* coda-bot wiki — graph + tag colors by note type */
+
+.tag[href="#gotcha"] {
+  background-color: rgba(220, 76, 70, 0.18);
+  color: #dc4c46;
+  border-color: rgba(220, 76, 70, 0.4);
+}
+
+.tag[href="#decision"] {
+  background-color: rgba(93, 135, 224, 0.18);
+  color: #5d87e0;
+  border-color: rgba(93, 135, 224, 0.4);
+}
+
+.tag[href="#question"] {
+  background-color: rgba(224, 168, 60, 0.18);
+  color: #e0a83c;
+  border-color: rgba(224, 168, 60, 0.4);
+}
+
+.tag[href="#domain"] {
+  background-color: rgba(86, 178, 132, 0.18);
+  color: #56b284;
+  border-color: rgba(86, 178, 132, 0.4);
+}
+
+.tag[href="#source"] {
+  background-color: rgba(150, 150, 160, 0.18);
+  color: #9696a0;
+  border-color: rgba(150, 150, 160, 0.4);
+}
+
+/* stale pages read dimmer than active ones */
+.markdown-preview-view .frontmatter-container .frontmatter-section-label {
+  opacity: 0.7;
+}

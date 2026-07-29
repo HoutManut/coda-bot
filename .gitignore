@@ -1,0 +1,41 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets
+.env
+backups/
+
+# Game assets -- lowiro-copyrighted art + legacy seed data; live data is in the DB
+assets/jackets/
+assets/arcsongs.json
+
+# OS / editor / tool cruft
+.DS_Store
+.vscode/
+.pytest_cache/
+.claude/
+
+# Obsidian per-machine state -- vault config + wiki/ are committed, session state is not
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.obsidian/themes/
+.trash/
+
+# Private research/design source docs -- archived outside this repo; wiki/ is the
+# public knowledge layer. Guard in case a copy is ever pulled back in locally.
+context/
+api_layer_findings.md
+
+# Logs
+logs/
+*.log
+*.log.[0-9]

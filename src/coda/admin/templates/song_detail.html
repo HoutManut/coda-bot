@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% from "_macros.html" import jacket_widget %}
+{% block title %}{{ song.name_en }}{% endblock %}
+
+{# Shared entity-link widgets. The datalist is declared once and referenced by
+   both the song picker and every chart picker (inputs can share a list). Each
+   option's value carries the resolved "(id)" tail the JS parses, so an alias
+   match still maps back to the real entity. #}
+{% macro link_datalist(list_id, opts) %}
+<datalist id="{{ list_id }}">
+  {% for o in opts %}<option value="{{ o.name }} ({{ o.id }})"></option>{% endfor %}
+</datalist>
+{% endmacro %}
+
+{% macro link_form(base, list_id, kind) %}
+<form method="post" action="{{ base }}" class="inline" data-linkform>
+  <input name="_pick" list="{{ list_id }}" placeholder="search {{ kind }} (name / alias / id)…"
+         autocomplete="off" data-linkpick>
+  <input type="hidden" name="id" data-linkid>
+  <button>Link</button>
+</form>
+{% endmacro %}
+
+{# Chips (unlink ✕) for a set of linked entities. #}
+{% macro link_chips(items, kind, id_attr, base) %}
+<ul class="links">
+  {% for it in items %}
+  <li><a href="/{{ kind }}s/{{ it|attr(id_attr) }}">{{ it.name }}</a> <code>{{ it|attr(id_attr) }}</code>
+    <form method="post" action="{{ base }}/{{ it|attr(id_attr) }}/unlink" class="inline">
+      <button class="link">✕</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{# Song-level link block: title + chips + search-to-link. ``base`` is the POST
+   target; unlink posts to ``base/<id>/unlink``. #}
+{% macro link_section(title, items, kind, id_attr, list_id, base) %}
+<div>
+  <h4 class="link-head">{{ title }}</h4>
+  {{ link_chips(items, kind, id_attr, base) }}
+  {{ link_form(base, list_id, kind) }}
+</div>
+{% endmacro %}
+
+{# Per-chart link block: an override toggle. Off = inherit the song (shown muted).
+   On = the chart's own set is authoritative — editable, and an empty set means
+   "explicitly unknown". ``base`` = /difficulties/<id>/<kind>. #}
+{% macro diff_link_block(title, kind, diff, overridden, items, song_items, id_attr, list_id) %}
+{% set base = '/difficulties/' ~ diff.id ~ '/' ~ kind %}
+<div>
+  <h4 class="link-head">{{ title }}</h4>
+  <form method="post" action="{{ base }}/override" class="inline" data-overrideform>
+    <label class="check"><input type="checkbox" name="on" {{ 'checked' if overridden }} data-overridetoggle> override {{ title|lower }}</label>
+  </form>
+  {% if overridden %}
+    {{ link_chips(items, kind, id_attr, base) }}
+    {% if not items %}<p class="muted inherit-note">— none (explicitly unknown) —</p>{% endif %}
+    {{ link_form(base, list_id, kind) }}
+  {% else %}
+    <p class="muted inherit-note">inherits song:
+      {%- for it in song_items %} {{ it.name }}{{ '' if loop.last else ',' }}{%- else %} — none —{%- endfor %}</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# An overridable difficulty field: value = override (blank if inherited),
+   placeholder = the song's inherited value so the user sees what they'd get. #}
+{% macro override_field(diff, field) %}
+  {% if field == 'jacket' %}
+    {{ jacket_widget('jacket', diff.jacket or '', song.song_id ~ '_' ~ diff.difficulty.value.upper()) }}
+  {% elif field == 'date' %}
+    <label>{{ field }} <input name="{{ field }}" value="{{ diff.date if diff.date is not none else '' }}"
+           placeholder="inherits: {{ song.date }}" data-secdate></label>
+  {% elif field == 'time' %}
+    <label data-tip="db: {{ diff.time if diff.time is not none else 'inherits ' ~ song.time }}">{{ field }}
+      <input name="{{ field }}" value="{{ display_time(diff.time) if diff.time is not none else '' }}"
+             placeholder="inherits: {{ display_time(song.time) }}"></label>
+  {% elif field == 'bg' %}
+    <label>{{ field }} <input name="{{ field }}" value="{{ diff.bg if diff.bg is not none else '' }}"
+           placeholder="inherits: {{ song.bg }}" list="bg-list"></label>
+  {% else %}
+    {% set ov = diff|attr(field) %}
+    <label>{{ field }} <input name="{{ field }}" value="{{ ov if ov is not none else '' }}"
+           placeholder="inherits: {{ song|attr(field) }}"></label>
+  {% endif %}
+{% endmacro %}
+
+{# Tag block: chips (unlink ✕) + an add form. Each chip shows the tag slug
+   tinted by its category color (category label on hover). The form shows only
+   the tag field: picking an existing label auto-submits (JS); typing a new
+   label reveals the category field (its own datalist) — a new category there
+   is auto-created server-side. #}
+{% macro tag_block(target, fk, items) %}
+{% set base = '/tags/assign/' ~ target ~ '/' ~ fk %}
+<ul class="tags">
+  {% for t in items %}
+  <li class="tag-chip" style="{{ tag_chip_style(t.color) }}" data-tip="{{ t.cat_label }}">
+    <span>{{ t.slug }}</span>
+    <form method="post" action="{{ base }}/remove" class="inline">
+      <input type="hidden" name="tag_id" value="{{ t.id }}">
+      <button class="link" title="remove">✕</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+<form method="post" action="{{ base }}/add" class="inline" data-tagform>
+  <input name="tag" placeholder="tag (pick or type new)…"
+         autocomplete="off" required data-tagpick>
+  <span class="tag-newcat" data-tagcat hidden>
+    <input name="category" list="tag-cat-list" placeholder="category (new tag)…"
+           autocomplete="off" data-tagcatinput>
+  </span>
+  <button>Add tag</button>
+</form>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ song.name_en }} <code>{{ song.song_id }}</code></h1>
+  <a href="/songs">← back</a>
+</div>
+{# error is rendered by base.html; only notice is page-local. #}
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+
+{# Shared autosuggest lists (bg names, pack names) populated from existing data. #}
+<datalist id="bg-list">{% for b in bg_options %}<option value="{{ b }}">{% endfor %}</datalist>
+<datalist id="packname-list">{% for p in packname_options %}<option value="{{ p }}">{% endfor %}</datalist>
+<datalist id="tag-cat-list">{% for c in tag_categories %}<option value="{{ c.label }}">{% endfor %}</datalist>
+{# Tag vocabulary for the floating picker (admin.js): categories with a tint
+   style + their tags. Read once, rendered into a reused panel on focus. #}
+<script id="tag-vocab" type="application/json">{{ tag_groups | tojson }}</script>
+{{ link_datalist('artist-list', artist_opts) }}
+{{ link_datalist('charter-list', charter_opts) }}
+
+<section class="card">
+  <h2>Song fields</h2>
+  <form method="post" action="/songs/{{ song.song_id }}" data-song-form data-dirty-track>
+    <label>idx <input name="idx" type="number" value="{{ song.idx }}"
+      data-tip="Editable; a clash bumps the occupant up by 1"></label>
+    <label>Pack
+      <select name="pack_id" data-pack>
+        <option value="">— none —</option>
+        {% for p in packs %}
+        <option value="{{ p.pack_id }}" data-name="{{ p.name }}" {{ 'selected' if p.pack_id == song.pack_id }}>{{ p.name }} ({{ p.pack_id }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>pack_name <input name="pack_name" value="{{ song.pack_name }}" list="packname-list" data-packname></label>
+    <label>name_en <input name="name_en" value="{{ song.name_en }}" required></label>
+    <label>name_jp <input name="name_jp" value="{{ song.name_jp }}"></label>
+    <label>artist (display) <input name="artist" value="{{ song.artist }}"></label>
+    <label>bpm <input name="bpm" value="{{ song.bpm }}" data-bpm></label>
+    <label>bpm_base <input name="bpm_base" type="number" step="any" value="{{ song.bpm_base }}" data-bpmbase></label>
+    <label data-tip="db: {{ song.time }}">time <input name="time" value="{{ display_time(song.time) }}" placeholder="3:35 or 215"></label>
+    <label>side
+      <select name="side">
+        {% for sid, label in side_choices() %}
+        <option value="{{ sid }}" {{ 'selected' if sid == song.side }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="world_unlock" {{ 'checked' if song.world_unlock }}> world_unlock</label>
+    <label class="check"><input type="checkbox" name="remote_download" {{ 'checked' if song.remote_download }}> remote_download</label>
+    <label>bg <input name="bg" value="{{ song.bg }}" list="bg-list"></label>
+    <label>date <input name="date" value="{{ song.date }}" placeholder="unix seconds (paste seconds or ISO)"
+      data-secdate></label>
+    <label>version <input name="version" value="{{ song.version }}"></label>
+    {{ jacket_widget('jacket', song.jacket, song.song_id) }}
+    <label>jacket_designer <input name="jacket_designer" value="{{ song.jacket_designer or '' }}"></label>
+    <div class="form-actions">
+      <button type="submit">Save song</button>
+      <span class="dirty-badge" data-dirty hidden>● unsaved</span>
+    </div>
+  </form>
+  <hr class="divider">
+  <form method="post" action="/songs/{{ song.song_id }}/rename" class="inline"
+        onsubmit="return confirm('Rename song_id? All charts, links and aliases follow automatically.')">
+    <label>song_id (primary key)
+      <input name="new_id" value="{{ song.song_id }}" pattern="\S+" required>
+    </label>
+    <button class="small">Rename id</button>
+    <span class="hint">Changing the id cascades to every chart, link and alias.</span>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Charts</h2>
+  {% for diff in diffs %}
+  {% set is_err = diff.difficulty.value == 'err' %}
+  <details class="chart diff-{{ diff.difficulty.value }}" id="chart-{{ diff.id }}">
+    <summary>{{ difficulty_label(diff.difficulty) }}
+      <span class="chart-stat">Lv {{ display_level(diff.level) }} · CC {{ display_rating(diff.rating) }} · {{ "{:,}".format(diff.note) }} notes</span></summary>
+    <form method="post" action="/difficulties/{{ diff.id }}" data-dirty-track>
+      {% if is_err %}
+        <label>rating <input value="?" disabled></label>
+        <label>level <input value="?" disabled></label>
+      {% else %}
+        <label data-tip="db: {{ diff.rating }}">rating (CC) <input name="rating" value="{{ display_rating(diff.rating) }}" placeholder="11.3 / TBA"></label>
+        <label data-tip="db: {{ diff.level }}">level <input name="level" value="{{ display_level(diff.level) }}" placeholder="9 / 10+ / TBA / ?"></label>
+      {% endif %}
+      <label>note <input name="note" type="number" value="{{ diff.note }}"></label>
+      <label>chart_designer <input name="chart_designer" value="{{ diff.chart_designer or '' }}"></label>
+
+      {% if diff.difficulty.value != 'ftr' %}
+      <details class="overrides">
+        <summary>Overrides</summary>
+        <label>game_song_id <input name="game_song_id" value="{{ diff.game_song_id or '' }}"
+          placeholder="inherits: {{ song.song_id }}"></label>
+        {% for field in overridable %}
+        {{ override_field(diff, field) }}
+        {% endfor %}
+      </details>
+      {% endif %}
+      <div class="form-actions">
+        <button type="submit">Save {{ diff.difficulty.value }}</button>
+        <span class="dirty-badge" data-dirty hidden>● unsaved</span>
+      </div>
+    </form>
+
+    {% if diff.difficulty.value != 'ftr' %}
+    <details class="diff-extras">
+      <summary>Links &amp; aliases</span></summary>
+      <div class="diff-links">
+        <h3>Relational links <span class="muted">(per chart)</span></h3>
+        <div class="cols">
+          {{ diff_link_block('Artists', 'artist', diff, diff.artists_overridden, diff_artists[diff.id], linked_artists, 'artist_id', 'artist-list') }}
+          {{ diff_link_block('Charters', 'charter', diff, diff.charters_overridden, diff_charters[diff.id], linked_charters, 'charter_id', 'charter-list') }}
+        </div>
+      </div>
+      <div class="diff-aliases">
+        <h3>Aliases</h3>
+        <ul class="aliases">
+          {% for a in diff_aliases[diff.id] %}
+          <li>
+            <span class="alias {{ 'auto' if a.alias in diff_auto_terms[diff.id] }}">{{ a.alias }}</span>
+            {% if a.alias in diff_auto_terms[diff.id] %}<span class="badge">auto</span>{% endif %}
+            <form method="post" action="/aliases/difficulty/{{ diff.id }}/remove" class="inline">
+              <input type="hidden" name="alias" value="{{ a.alias }}">
+              <button class="link" title="remove">✕</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        <form method="post" action="/aliases/difficulty/{{ diff.id }}/add" class="inline">
+          <input name="alias" placeholder="add alias…" required>
+          <button>Add</button>
+        </form>
+      </div>
+    </details>
+    {% endif %}
+
+    <details class="diff-tags"> 
+        <summary>Tags</summary>
+        <div class="diff-tags">
+            <h3>Tags</h3>
+            {{ tag_block('difficulty', diff.id, diff_tags[diff.id]) }}
+        </div>
+    </details>
+
+    <form method="post" action="/difficulties/{{ diff.id }}/delete"
+          onsubmit="return confirm('Delete this chart?')">
+      <button class="danger small">Delete chart</button>
+    </form>
+  </details>
+  {% endfor %}
+
+  {% if addable %}
+  <details class="chart add">
+    <summary>+ Add chart</summary>
+    <form method="post" action="/songs/{{ song.song_id }}/difficulties" data-addchart>
+      <label>difficulty
+        <select name="difficulty">
+          {% for d in addable %}<option value="{{ d.value }}">{{ difficulty_label(d) }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>rating (CC) <input name="rating" placeholder="11.3 / TBA" data-rating-src></label>
+      <label>level <input name="level" placeholder="9 / 10+ / TBA / ?" data-level-prefill></label>
+      <label>note <input name="note" type="number" value="0"></label>
+      <label>chart_designer <input name="chart_designer" data-designer></label>
+      <details class="overrides">
+        <summary>Overrides <span class="muted">(optional)</span></summary>
+        <label>game_song_id <input name="game_song_id" placeholder="e.g. lasteternity (byd_2)"></label>
+        <label>name_en override <input name="name_en" placeholder="optional (e.g. err title)"></label>
+      </details>
+      <button type="submit">Add chart</button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+
+<section class="card" id="aliases">
+  <h2>Aliases <span class="muted">(search terms)</span></h2>
+  <ul class="aliases">
+    {% for a in aliases %}
+    <li>
+      <span class="alias {{ 'auto' if a.alias in auto_terms }}">{{ a.alias }}</span>
+      {% if a.alias in auto_terms %}<span class="badge">auto</span>{% endif %}
+      <form method="post" action="/aliases/song/{{ song.song_id }}/remove" class="inline">
+        <input type="hidden" name="alias" value="{{ a.alias }}">
+        <button class="link" title="remove">✕</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="/aliases/song/{{ song.song_id }}/add" class="inline">
+    <input name="alias" placeholder="add alias…" required>
+    <button>Add</button>
+  </form>
+</section>
+
+<section class="card" id="links">
+  <h2>Relational links</h2>
+  <div class="cols">
+    {{ link_section('Artists', linked_artists, 'artist', 'artist_id', 'artist-list', '/songs/' ~ song.song_id ~ '/artists') }}
+    {{ link_section('Charters', linked_charters, 'charter', 'charter_id', 'charter-list', '/songs/' ~ song.song_id ~ '/charters') }}
+  </div>
+</section>
+
+<section class="card" id="tags">
+  <h2>Tags</h2>
+  {{ tag_block('song', song.song_id, song_tags) }}
+</section>
+
+<section class="card danger-zone">
+  <h2>Danger zone</h2>
+  <form method="post" action="/songs/{{ song.song_id }}/delete"
+        onsubmit="return confirm('Delete this song and all its charts/aliases/links?')">
+    <button class="danger">Delete song</button>
+  </form>
+</section>
+{% endblock %}
