@@ -7,15 +7,15 @@ from PIL import Image
 from coda.chardle.columns import LABELS, Clue
 from coda.chardle.feedback import Cell
 from coda.chardle.imaging import assets, layout, text
-from coda.chardle.imaging.values import bpm_lines, cell_text
+from coda.chardle.imaging.values import bpm_lines, cell_text, charter_lines
 from coda.chardle.views import Board, BoardRow
 from coda.db.enums import DifficultyClass
 
 LABEL_FILL = (255, 255, 255)
 VALUE_FILL = (72, 72, 72)
-VALUE_FILL_SUBTLE = (170, 170, 170)
-BPM_BASE_SIZE = 18
-BPM_LINE_GAP = 6
+VALUE_FILL_SUBTLE = (120, 120, 120)
+SUBTEXT_SIZE = 18
+SUBTEXT_GAP = 6
 
 FRAME_OFFSET = 14
 JACKET_OFFSET = 26
@@ -82,27 +82,32 @@ def _paste_cell(
     if clue is Clue.SIDE:
         _paste_pill(plate, bounds, row)
     if clue is Clue.BPM:
-        _paste_bpm(plate, bounds, row)
+        _paste_stacked(plate, bounds, bpm_lines(row.facts))
+        return
+    if clue is Clue.CHARTER:
+        _paste_stacked(plate, bounds, charter_lines(row.facts))
         return
     block = text.fit(cell_text(clue, row.facts), right - left - 2 * layout.PADDING)
     text.draw(plate, block, (left, 0, right, layout.ROW_HEIGHT), VALUE_FILL)
 
 
-def _paste_bpm(plate: Image.Image, bounds: tuple[int, int], row: BoardRow) -> None:
-    """The freeform BPM string a player reads, with the hidden numeric base the
-    clue actually grades shown small underneath -- the two can read very
-    differently (``"180?"`` next to ``179.98``)."""
+def _paste_stacked(
+    plate: Image.Image, bounds: tuple[int, int], lines: tuple[str, str]
+) -> None:
+    """A cell's freeform primary line, with a smaller subtext line underneath
+    when the clue has more to say than the primary string shows (BPM's hidden
+    numeric base, charter's real names behind a display alias)."""
     left, right = bounds
     width = right - left - 2 * layout.PADDING
-    display, base = bpm_lines(row.facts)
-    primary = text.fit(display, width)
-    if not base:
+    primary_text, secondary_text = lines
+    primary = text.fit(primary_text, width)
+    if not secondary_text:
         text.draw(plate, primary, (left, 0, right, layout.ROW_HEIGHT), VALUE_FILL)
         return
-    secondary = text.fit_at(base, width, BPM_BASE_SIZE)
-    top = (layout.ROW_HEIGHT - (primary.height + BPM_LINE_GAP + secondary.height)) // 2
+    secondary = text.fit_at(secondary_text, width, SUBTEXT_SIZE)
+    top = (layout.ROW_HEIGHT - (primary.height + SUBTEXT_GAP + secondary.height)) // 2
     text.draw(plate, primary, (left, top, right, top + primary.height), VALUE_FILL)
-    secondary_top = top + primary.height + BPM_LINE_GAP
+    secondary_top = top + primary.height + SUBTEXT_GAP
     text.draw(
         plate,
         secondary,

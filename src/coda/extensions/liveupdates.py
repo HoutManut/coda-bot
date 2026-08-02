@@ -49,15 +49,13 @@ _SAMPLING_CAVEAT = (
     "plays are never seen."
 )
 
+_D_GRADE_CHOICE = lightbulb.Choice(name="D (All)", value="D")
+_AA_GRADE_CHOICE = lightbulb.Choice(name="AA", value="AA")
+
 # Only the grades worth a milestone. Lower ones fire on almost every play.
-_D_GRADE_CHOICE = lightbulb.Choice(name="D", value="D")
 _GRADE_CHOICES = [
     lightbulb.Choice(name="off", value=_OFF_CHOICE),
-    _D_GRADE_CHOICE,
-    lightbulb.Choice(name="C", value="C"),
-    lightbulb.Choice(name="B", value="B"),
-    lightbulb.Choice(name="A", value="A"),
-    lightbulb.Choice(name="AA", value="AA"),
+    _AA_GRADE_CHOICE,
     lightbulb.Choice(name="EX", value="EX"),
     lightbulb.Choice(name="EX+", value="EX_PLUS"),
 ]
@@ -535,8 +533,8 @@ class Floor(
     min_grade = lightbulb.string(
         "min_grade",
         "Only plays at this grade or better",
-        default=_D_GRADE_CHOICE,
-        choices=[_D_GRADE_CHOICE] + _GRADE_CHOICES,
+        default=_OFF_CHOICE,
+        choices=_GRADE_CHOICES,
     )
 
     @lightbulb.invoke

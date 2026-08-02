@@ -10,6 +10,7 @@ from coda.utils.encoding import decode_level
 
 UNKNOWN_CC = "?.?"
 UNKNOWN = "—"
+MAX_CHARTER_NAMES = 3
 
 
 def cell_text(clue: Clue, facts: ChartFacts) -> str:
@@ -38,10 +39,25 @@ def cell_text(clue: Clue, facts: ChartFacts) -> str:
             return str(facts.note) if facts.note > 0 else UNKNOWN
 
 
+def charter_lines(facts: ChartFacts) -> tuple[str, str]:
+    """The charter cell's two lines: the display name/group a player reads,
+    and the real linked charters underneath -- can be one alias hiding many
+    people, so the subtext caps at a few names plus a ``+n`` overflow."""
+    primary = facts.charter_text or UNKNOWN
+    names = sorted(facts.charters)
+    if not names or names == [facts.charter_text]:
+        return primary, ""
+    if len(names) <= MAX_CHARTER_NAMES:
+        return primary, ", ".join(names)
+    shown = names[: MAX_CHARTER_NAMES - 1]
+    return primary, ", ".join(shown) + f", +{len(names) - len(shown)}"
+
+
 def bpm_lines(facts: ChartFacts) -> tuple[str, str]:
     """The BPM cell's two lines: the freeform display string a player reads,
     and the hidden numeric base the arrow/yellow-red math actually compares --
     shown small underneath since it's the thing the clue is grading."""
     if facts.bpm <= 0:
         return UNKNOWN, ""
-    return facts.bpm_display, f"{facts.bpm:g}"
+    base = f"{facts.bpm:g}"
+    return facts.bpm_display, "" if facts.bpm_display == base else base

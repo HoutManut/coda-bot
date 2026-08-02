@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coda.chardle import schedule, tiers
-from coda.chardle.columns import select_columns
+from coda.chardle.columns import MAX_COLUMNS, select_columns
 from coda.chardle.facts import load_pool
 from coda.chardle.tiers import DAILY_ATTEMPTS, Tier
 from coda.db.models import ChardlePuzzle
@@ -62,11 +62,14 @@ class PuzzleService:
         level: int | None = None,
         side: int | None = None,
         max_attempts: int | None = None,
+        max_columns: int = MAX_COLUMNS,
         now: datetime,
         epoch: date,
     ) -> ChardlePuzzle:
         """An on-demand board. Filters make it a custom challenge, and a custom
         challenge is stats-ineligible by construction."""
+        if tier_name == tiers.RANDOM_TIER:
+            tier_name = tiers.roll_random_tier(self._rng)
         tier = tiers.get(tier_name)
         if tier.name != tiers.ERR_TIER and tiers.roll_err(
             self._rng, in_event_window=schedule.in_april_window(now)
@@ -79,7 +82,13 @@ class PuzzleService:
 
         filters = _filters(level, side)
         puzzle = await self._draw(
-            db, tier, attempts=max_attempts, level=level, side=side, filters=filters
+            db,
+            tier,
+            attempts=max_attempts,
+            level=level,
+            side=side,
+            filters=filters,
+            max_columns=max_columns,
         )
         await db.commit()
         return puzzle
@@ -101,6 +110,7 @@ class PuzzleService:
         level: int | None = None,
         side: int | None = None,
         filters: dict | None = None,
+        max_columns: int = MAX_COLUMNS,
     ) -> ChardlePuzzle:
         pool = await load_pool(
             db,
@@ -112,7 +122,7 @@ class PuzzleService:
         if not pool:
             raise EmptyPool
         answer = self._rng.choice(pool)
-        columns = select_columns(pool, answer, rng=self._rng)
+        columns = select_columns(pool, answer, max_columns=max_columns, rng=self._rng)
         puzzle = ChardlePuzzle(
             song_difficulty_id=answer.difficulty_id,
             clue_columns=[str(clue) for clue in columns],

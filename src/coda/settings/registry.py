@@ -4,10 +4,6 @@ from coda.settings.types import ConfigKey, Scope
 from coda.utils.zones import DEFAULT_ZONE
 
 REGISTRY: dict[str, ConfigKey] = {
-    # No `locale` key: Discord already carries one. `interaction.locale` is the
-    # invoking user's own client language, so every command render path reads it
-    # straight off the interaction. Only the live poster has no interaction, and
-    # it renders English -- see coda/scores/poster.py.
     "polling": ConfigKey(
         name="polling",
         default="on",
@@ -36,7 +32,7 @@ REGISTRY: dict[str, ConfigKey] = {
     ),
     "chardle_debug_board": ConfigKey(
         name="chardle_debug_board",
-        default="on",
+        default="off",
         type=("on", "off"),
         guild_chain=(Scope.GLOBAL,),
         dm_chain=(Scope.GLOBAL,),

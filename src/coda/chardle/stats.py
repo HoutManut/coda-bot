@@ -53,11 +53,15 @@ class StatsService:
         solved = sorted(
             number for number, tier, state in rows if _counts_for_streak(tier, state)
         )
+        # Puzzle #0 is epoch day; a future epoch backdates numbering into
+        # negatives. Those pre-epoch dailies still count as solved but can't
+        # chain into a streak.
+        streak_eligible = [number for number in solved if number >= 0]
         return PlayerStats(
             played=len(rows),
             solved=len(solved),
-            current_streak=_current_streak(solved, current_number),
-            longest_streak=_longest_streak(solved),
+            current_streak=_current_streak(streak_eligible, current_number),
+            longest_streak=_longest_streak(streak_eligible),
             distribution=await self._distribution(db, discord_id),
         )
 

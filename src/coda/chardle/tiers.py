@@ -72,8 +72,9 @@ TIERS: dict[str, Tier] = {
     ),
 }
 
-DEFAULT_TIER = "ftr"
 ERR_TIER = "err"
+RANDOM_TIER = "random"
+DEFAULT_TIER = RANDOM_TIER
 
 # Deliberately absent from the ordinary daily rotation: err is dated.
 _DAILY_WEIGHTS: dict[str, float] = {
@@ -81,6 +82,15 @@ _DAILY_WEIGHTS: dict[str, float] = {
     "extras": 0.2,
     "prs": 0.15,
     "pst": 0.1,
+}
+
+_FREE_RANDOM_WEIGHTS: dict[str, float] = {
+    "ftr": 0.55,
+    "prs": 0.15,
+    "pst": 0.1,
+    "extras": 0.1,
+    "byd": 0.05,
+    "etr": 0.05,
 }
 
 
@@ -104,6 +114,13 @@ def playable_names() -> list[str]:
 def roll_daily_tier(rng: random.Random) -> str:
     names = list(_DAILY_WEIGHTS)
     return rng.choices(names, weights=[_DAILY_WEIGHTS[n] for n in names])[0]
+
+
+def roll_random_tier(rng: random.Random) -> str:
+    """Weighted roll for ``/chardle play``'s random-tier option. Frozen once
+    per board, same as columns/answer -- resolved before the pool is drawn."""
+    names = list(_FREE_RANDOM_WEIGHTS)
+    return rng.choices(names, weights=[_FREE_RANDOM_WEIGHTS[n] for n in names])[0]
 
 
 def roll_err(rng: random.Random, *, in_event_window: bool) -> bool:

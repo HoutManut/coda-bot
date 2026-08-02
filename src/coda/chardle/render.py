@@ -87,7 +87,7 @@ def _debug_embed(board: Board) -> hikari.Embed:
     header = [
         f"-# DEBUG · tier `{board.tier}` · columns "
         + " ".join(f"`{clue}`" for clue in board.columns),
-        f"**ANSWER: {board.answer.name}** · {_chart_label(board.answer)} "
+        f"**ANSWER: {board.answer.name}** · {chart_label(board.answer)} "
         f"· chart `{board.answer.difficulty_id}`",
         _answer_values(board),
         "",
@@ -298,13 +298,12 @@ def _status(board: Board) -> str:
 
 
 def _reveal(answer: ChartFacts) -> str:
-    return f"**{answer.name}** · {_chart_label(answer)}"
+    return f"**{answer.name}** · {chart_label(answer)}"
 
 
-def _chart_label(answer: ChartFacts) -> str:
+def chart_label(answer: ChartFacts) -> str:
     label = CLASS_FULL[answer.difficulty_class]
     if answer.difficulty_class is DifficultyClass.ERR:
         return label
-    cc = format_cc(answer.rating)
     level = decode_level(answer.level)
-    return f"{label} {level}" if cc is None else f"{label} {level} ({cc})"
+    return f"{label} {level}"

@@ -20,10 +20,12 @@ from coda.catalog.search import SearchService
 from coda.chardle import board as board_builder
 from coda.chardle import render, schedule, sticky, tiers, transport
 from coda.chardle.channels import ChardleChannelService
-from coda.chardle.columns import CANONICAL_ORDER, LABELS
+from coda.chardle.columns import CANONICAL_ORDER, LABELS, MAX_COLUMNS
+from coda.chardle.facts import load_facts
 from coda.chardle.feedback import Windows
 from coda.chardle.guess import (
     Accepted,
+    Cooldown,
     Duplicate,
     GuessService,
     Invalid,
@@ -32,7 +34,7 @@ from coda.chardle.guess import (
 from coda.chardle.puzzle import EmptyPool, PuzzleService
 from coda.chardle.session import SessionService
 from coda.chardle.stats import StatsService
-from coda.db.enums import ChardleState, DifficultyClass, Side
+from coda.db.enums import ChardleState, DifficultyClass
 from coda.db.models import ChardleGuess, ChardlePuzzle, ChardleSession
 from coda.db.session import async_session
 from coda.settings import ConfigService
@@ -250,7 +252,19 @@ async def start_daily(
 
         existing = await sessions.daily_of(db, puzzle.id, user_id)
         if existing is not None:
-            return _resume(existing, guild_id)
+            is_dm = existing.guild_id is None or (
+                await channels.player_thread(db, existing.guild_id, user_id)
+            ) != existing.board_channel_id
+            stale_dm = (
+                is_dm
+                and guild_id is not None
+                and await channels.channel_id(db, guild_id) is not None
+            )
+            if guild_id is not None and existing.state is not ChardleState.PLAYING:
+                await sticky.refresh(
+                    app, db, channels, settings, guild_id=guild_id, puzzle=puzzle
+                )
+            return _resume(existing, guild_id, is_dm=is_dm, stale_dm=stale_dm)
 
         configured_id = await channels.channel_id(db, guild_id)
         # A thread under a channel they cannot see would be invisible to them,
@@ -279,7 +293,7 @@ async def start_daily(
                 _no_transport(configured_id, parent_id),
                 ok=False,
             )
-        board_channel_id, message_id = posted
+        board_channel_id, message_id, is_dm = posted
 
         try:
             opened = await sessions.open_daily(
@@ -300,7 +314,7 @@ async def start_daily(
             await sticky.refresh(
                 app, db, channels, settings, guild_id=guild_id, puzzle=puzzle
             )
-    return _resume(opened, guild_id)
+    return _resume(opened, guild_id, is_dm=is_dm, stale_dm=False)
 
 
 async def _post_daily_board(
@@ -313,7 +327,7 @@ async def _post_daily_board(
     user: hikari.User,
     guild_id: int | None,
     parent_channel_id: int | None,
-) -> tuple[int, int] | None:
+) -> tuple[int, int, bool] | None:
     """Resolve a private destination and put the board in it.
 
     Retries once without the remembered thread: a thread can be deleted or
@@ -359,7 +373,7 @@ async def _post_daily_board(
 
         if guild_id is not None:
             await _remember_transport(db, channels, guild_id, user, resolved)
-        return channel_id, int(message.id)
+        return channel_id, int(message.id), not resolved.destination.is_thread
     return None
 
 
@@ -417,13 +431,27 @@ async def _delete_quietly_channel(app: hikari.RESTAware, channel_id: int) -> Non
         logger.info("chardle: could not clean up thread %s", channel_id)
 
 
-def _resume(session: ChardleSession, guild_id: int | None) -> hikari.Embed:
-    where = _link(guild_id, session.board_channel_id, session.message_id)
+def _resume(
+    session: ChardleSession, guild_id: int | None, *, is_dm: bool, stale_dm: bool
+) -> hikari.Embed:
+    """``is_dm`` decides the link -- a guild segment on a DM channel resolves to
+    nothing. ``stale_dm`` flags the one confusing case: the server now has a
+    Chardle channel, but today's board already opened in DMs before it was set
+    and stays there -- an already-posted board can't be moved retroactively.
+    """
+    link_guild = None if is_dm else guild_id
+    where = _link(link_guild, session.board_channel_id, session.message_id)
     if session.state is not ChardleState.PLAYING:
         return _embed("Already played", f"{_DAILY_DONE} [Board]({where})")
+    note = (
+        " It started before this server had a Chardle channel set, so today's "
+        "stays in your DMs."
+        if stale_dm
+        else ""
+    )
     return _embed(
         "Your daily is ready",
-        f"[Open the board]({where}) and reply to it, or use `/chardle guess`.",
+        f"[Open the board]({where}) and reply to it, or use `/chardle guess`.{note}",
     )
 
 
@@ -437,32 +465,6 @@ class Play(
     name="play",
     description="Start a free-play board in this channel",
 ):
-    tier = lightbulb.string(
-        "difficulty",
-        "Which difficulty to guess in",
-        default=tiers.DEFAULT_TIER,
-        choices=[
-            lightbulb.Choice(name=tiers.get(name).pick_label, value=name)
-            for name in tiers.playable_names()
-        ],
-    )
-    level = lightbulb.string("level", "Restrict to one level, e.g. 9 or 10+", default="")
-    side = lightbulb.string(
-        "side",
-        "Restrict to one side",
-        default="",
-        choices=[
-            lightbulb.Choice(name=member.value.title(), value=member.value)
-            for member in Side
-        ],
-    )
-    attempts = lightbulb.integer(
-        "attempts",
-        "Size of the shared attempt pool",
-        default=tiers.FREE_ATTEMPTS,
-        min_value=1,
-        max_value=tiers.MAX_FREE_ATTEMPTS,
-    )
     thread = lightbulb.string(
         "room",
         "Put the board in its own room",
@@ -472,6 +474,33 @@ class Play(
             lightbulb.Choice(name="Public thread", value=_THREAD_PUBLIC),
             lightbulb.Choice(name="Private thread", value=_THREAD_PRIVATE),
         ],
+    )
+    tier = lightbulb.string(
+        "difficulty",
+        "Which difficulty to guess in",
+        default=tiers.DEFAULT_TIER,
+        choices=[
+            lightbulb.Choice(name="Random", value=tiers.RANDOM_TIER),
+            *[
+                lightbulb.Choice(name=tiers.get(name).pick_label, value=name)
+                for name in tiers.playable_names()
+            ],
+        ],
+    )
+    level = lightbulb.string("level", "Restrict to one level, e.g. 9 or 10+", default="")
+    columns = lightbulb.integer(
+        "columns",
+        "Number of clue columns",
+        default=MAX_COLUMNS,
+        min_value=3,
+        max_value=8,
+    )
+    attempts = lightbulb.integer(
+        "attempts",
+        "Size of the shared attempt pool",
+        default=tiers.FREE_ATTEMPTS,
+        min_value=1,
+        max_value=tiers.MAX_FREE_ATTEMPTS,
     )
 
     @lightbulb.invoke
@@ -517,8 +546,8 @@ class Play(
                     db,
                     tier_name=self.tier,
                     level=encode_level(self.level) if self.level else None,
-                    side=_side_id(self.side),
                     max_attempts=self.attempts,
+                    max_columns=self.columns,
                     now=datetime.now(UTC),
                     epoch=await _epoch(db, settings),
                 )
@@ -610,15 +639,6 @@ def _board_up(guild_id: int | None, channel_id: int, message_id: int) -> str:
     )
 
 
-_SIDE_IDS: dict[str, int] = {
-    Side.from_id(side_id).value: side_id for side_id in range(len(Side))
-}
-
-
-def _side_id(value: str) -> int | None:
-    return _SIDE_IDS.get(value)
-
-
 # --- /chardle guess ---------------------------------------------------------
 
 
@@ -672,7 +692,7 @@ class Guess(
         settings: ConfigService,
         channels: ChardleChannelService,
     ) -> None:
-        await ctx.defer(ephemeral=True)
+        await ctx.defer()
         channel_id = int(ctx.channel_id)
         user_id = int(ctx.user.id)
 
@@ -732,6 +752,13 @@ async def _apply_guess(
     if session.state is not ChardleState.PLAYING:
         return None, _embed("Finished", _FINISHED, ok=False)
 
+    remaining = await guesses.cooldown_remaining(db, session.id, discord_id)
+    if remaining is not None:
+        outcome = Cooldown(remaining)
+        return outcome, _embed(
+            "Wait", f"Someone else just guessed — {remaining:.1f}s left.", ok=False
+        )
+
     outcome = await guesses.submit(
         db,
         puzzle,
@@ -757,15 +784,17 @@ async def _apply_guess(
             )
         case Searched():
             return outcome, _embed("Search", outcome.describe(), ok=False)
-        case Accepted(state=state):
+        case Accepted(difficulty_id=difficulty_id, state=state):
             await _refresh(app, db, puzzle, session, view)
+            fact = (await load_facts(db, [difficulty_id]))[difficulty_id]
+            label = f"{fact.name} · {render.chart_label(fact)}"
             if state is ChardleState.WON:
-                sessions_note = "Solved it."
-            elif state is ChardleState.LOST:
-                sessions_note = "That was the last attempt."
-            else:
-                sessions_note = "Guess recorded."
-            return outcome, _embed("Guessed", sessions_note)
+                return outcome, _embed("Solved", f"It was **{label}**.")
+            if state is ChardleState.LOST:
+                return outcome, _embed(
+                    "Out of guesses", f"It was **{label}**.", ok=False
+                )
+            return outcome, _embed("Guessed", f"**{label}**.")
         case _:
             return outcome, _embed("Guessed", "Guess recorded.")
 
@@ -1180,8 +1209,14 @@ async def _on_reply(
         await _sticky_after(event.app, db, channels, settings, session, outcome)
 
     # ❌ reads as "rejected"; a search was understood, it just was not a guess.
-    reaction = "🔍" if isinstance(outcome, Searched) else "❌"
-    if isinstance(outcome, (Invalid, Duplicate, Searched)):
+    # ⏳ is a cooldown, not a rejection -- it'll go through once the wait is up.
+    if isinstance(outcome, Searched):
+        reaction = "🔍"
+    elif isinstance(outcome, Cooldown):
+        reaction = "⏳"
+    else:
+        reaction = "❌"
+    if isinstance(outcome, (Invalid, Duplicate, Searched, Cooldown)):
         try:
             await message.add_reaction(reaction)
         except hikari.HikariError:

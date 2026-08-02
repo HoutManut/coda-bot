@@ -69,7 +69,16 @@ class Accepted:
     state: ChardleState
 
 
-Outcome = Invalid | Duplicate | Searched | Accepted
+@dataclass(frozen=True)
+class Cooldown:
+    """Blocked by the per-session guess pacing window. Costs nothing."""
+
+    remaining: float
+
+
+Outcome = Invalid | Duplicate | Searched | Accepted | Cooldown
+
+COOLDOWN_SECONDS = 3.0
 
 _NO_MATCH = "No song by that name."
 _NOT_PLAYABLE = "That song has no chart in this puzzle's difficulty."
@@ -167,6 +176,27 @@ class GuessService:
             _ANSWER_TERM_SQL, {"q": typed.strip().lower(), "song_id": song_id}
         )
         return hit.first() is not None
+
+    async def cooldown_remaining(
+        self, db: AsyncSession, session_id: int, discord_id: int
+    ) -> float | None:
+        """Seconds left before ``discord_id`` may guess, or ``None`` if clear.
+
+        Never blocks the same player two guesses in a row -- only a *different*
+        player's guess starts the clock on someone.
+        """
+        row = (
+            await db.execute(
+                select(ChardleGuess.discord_id, ChardleGuess.created_at)
+                .where(ChardleGuess.session_id == session_id)
+                .order_by(ChardleGuess.ordinal.desc())
+                .limit(1)
+            )
+        ).first()
+        if row is None or row.discord_id == discord_id:
+            return None
+        elapsed = (datetime.now(UTC) - row.created_at).total_seconds()
+        return None if elapsed >= COOLDOWN_SECONDS else COOLDOWN_SECONDS - elapsed
 
     async def _board_charts(self, db: AsyncSession, session_id: int) -> list[int]:
         rows = await db.execute(

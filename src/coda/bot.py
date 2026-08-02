@@ -42,6 +42,9 @@ def build() -> hikari.GatewayBot:
         logs=None,
         intents=hikari.Intents.ALL_UNPRIVILEGED | hikari.Intents.MESSAGE_CONTENT,
     )
+    # DEV_GUILD_IDS set -> guild-scoped, instant sync, no DM commands (dev).
+    # DEV_GUILD_IDS unset -> global, ~1hr propagation, DM-visible (prod).
+    # Guild-scoped commands never appear in DMs -- only global ones can.
     client = lightbulb.client_from_app(bot, default_enabled_guilds=config.dev_guild_ids)
 
     coordinator = PollCoordinator()

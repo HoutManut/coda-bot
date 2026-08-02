@@ -42,12 +42,13 @@ CANONICAL_ORDER: tuple[Clue, ...] = (
     Clue.NOTE,
 )
 
-MAX_COLUMNS = 7
+MAX_COLUMNS = 6
 
 # At most one from each: CC determines level, and a pack ships at a version.
 REDUNDANT_GROUPS: tuple[tuple[Clue, ...], ...] = (
     (Clue.LEVEL, Clue.RATING),
     (Clue.PACK, Clue.VERSION),
+    (Clue.BPM, Clue.NOTE),
 )
 
 ORDERED_CLUES = frozenset(
@@ -91,6 +92,7 @@ def select_columns(
     pool: Sequence[ChartFacts],
     answer: ChartFacts,
     *,
+    max_columns: int = MAX_COLUMNS,
     rng: random.Random | None = None,
 ) -> list[Clue]:
     """Roll a column set this pool and this answer can actually support."""
@@ -108,7 +110,7 @@ def select_columns(
 
     fillers = list(eligible)
     rng.shuffle(fillers)
-    chosen.extend(fillers[: max(0, MAX_COLUMNS - len(chosen))])
+    chosen.extend(fillers[: max(0, max_columns - len(chosen))])
     return in_render_order([str(clue) for clue in chosen])
 
 
