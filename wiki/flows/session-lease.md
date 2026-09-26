@@ -10,7 +10,6 @@ grade: A
 tags: [flow, sessions, arcaea]
 aliases: ["Session Lease"]
 ---
-
 # Session Lease
 
 ## Trigger

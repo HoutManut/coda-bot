@@ -8,7 +8,6 @@ updated: 2026-07-21
 tags: [decision, layering, arcaea]
 aliases: ["`src/coda/arcaea/` never imports `coda.db`", "Decision — arcaea never imports db"]
 ---
-
 # `src/coda/arcaea/` never imports `coda.db`
 
 ## Context

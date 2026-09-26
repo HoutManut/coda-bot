@@ -7,7 +7,6 @@ created:
 updated:
 tags: [question]
 ---
-
 # <Question, phrased as a question>
 
 ## Why it is open

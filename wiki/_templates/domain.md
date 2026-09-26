@@ -7,8 +7,7 @@ created:
 updated:
 tags: [domain, arcaea]
 ---
-
-# <Domain area>
+# <Domain area,>
 
 ## Model
 

@@ -3,7 +3,7 @@ type: meta
 title: "Hot Cache"
 status: active
 created: 2026-07-21
-updated: 2026-07-28
+updated: 2026-07-30
 tags: [meta, cache]
 aliases: ["Recent Context", "Hot Cache"]
 ---
@@ -11,7 +11,54 @@ aliases: ["Recent Context", "Hot Cache"]
 # Recent Context
 
 ## Last Updated
-2026-07-28. **`/run` owner terminal BUILT, same day it was designed** — `/config global` and `/reconcile` are deleted, `coda/ops/` holds the verb table, and the audience filter (`user_keys()`) closes the `/config view` leak that reading the code turned up. The no-coercion bug is fixed on both write paths. `chardle_timezone` became `timezone`: one clock now drives Chardle rollover and day/night jacket art. One item still open — the autocomplete replacement capture ([[h-run-terminal-build-time]] item 1). Same day, earlier: **Chardle reviewed end to end**, first pass over the shipped build. Seven findings, five fixed — the load-bearing one is that the clue-column selector was silently deleting `charter` from every tier and `artist` from all but `byd`, which also pinned board shape to 4 possibilities per tier. Previously 2026-07-27: **Chardle designed, not built** across three sessions the same day: initial design, then **guild race collapsed into free play** (race is no longer a mode), then an **edge-case sweep** that baked the owner's four manual notes into the pages and left one open question behind. The Wordle-over-the-catalog minigame comes from the archived Tenniel bot, revived on paper against coda-bot's structure. Tournaments and chardle are the two unbuilt modules. Previously 2026-07-24: live-updates poster BUILT, score tracking complete end to end. 100 pages.
+2026-07-30. **Tournament bracket + chart-ban formats sketched, design target only, nothing
+built** — [[h-tournament-bracket-and-ban-formats]], extending [[tournaments|Tournaments]]
+beyond its existing leaderboard/FFA-only model. A `Match` entity sits above the existing
+round/`Game` primitive for pairwise brackets: best-of-N per match, **explicit**
+`winner_to`/`loser_to` pointers (not round/slot arithmetic, for clean bye/irregular-size
+handling), true double elimination with a grand-final reset match created **lazily** only if
+the loser-bracket champion wins game 1 of the final (the winner-bracket champion enters with
+zero losses, so beating them once isn't enough to eliminate them). The whole match graph
+generates once, at roster-freeze — reusing the existing roster-locks-at-`OPEN` invariant —
+with byes to top seeds and loser-bracket routing via the standard interleaved-round formula.
+Also sketched: a `BanPhase` for player-facing chart bans (upfront-per-match or per-game
+cadence, chosen at creation; loser-priority turn order for per-game, seed-order fallback for
+upfront since there's no loser yet before game 1; random auto-ban on turn timeout) — the
+tournament layer's first player-facing interactive step, needing a turn-timeout ticker and a
+live select-menu surface that nothing else in the design needed before. Neither addition
+breaks "the tournament layer never calls the lowiro API." Earlier same day: **Chardle guess
+cooldown, attribution, and finished-daily sticky refresh settled AND built** — [[h-chardle-cooldown-and-attribution]], closing three of four ideas on
+[[h-chardle-shared-board-modes]]: guess cooldown is **3s, universal, no `Play` toggle** (same
+`discord_id` back-to-back is never blocked; enforced in `_apply_guess` before
+`guesses.submit` via new `Outcome.Cooldown`, looked up by `ordinal DESC` not `created_at`);
+every `/chardle guess` reply drops `ephemeral` and names the chart
+(`render.chart_label`, un-privated from `_chart_label`), unconditionally across board kinds;
+a daily finished elsewhere (DM, no guild channel set yet) now folds into a guild's scoreboard
+via `sticky.refresh` once the player resumes it there. Idea #1's original ask — relocating an
+*unbeaten* daily's transport mid-game — stays fully open, the only thing left on that page.
+Earlier same day: **`/chardle play` option rework settled AND built** — [[h-chardle-play-options-settled]]
+(closes [[h-chardle-play-options-rework]]): `side` hidden not deleted (dropped from the command,
+kept in `puzzles.free`); random tier added as a weighted `"Random"` choice on `difficulty`
+(`tiers.RANDOM_TIER`, `ftr .55/prs .15/pst .1/extras .1/byd .05/etr .05`), resolved once per
+board inside `PuzzleService.free` before the pool draw — no new err handling needed, since
+`roll_err`'s ambient/event chance already fires on every free-play call regardless of how the
+tier was picked; column *count* only (explicit choice deferred, still blocked on
+[[h-chardle-board-rendering]]) via a new `columns` option (`3`–`8`, default 7) threaded through
+`select_columns` as `max_columns`; `room` moved to `Play`'s first option. Earlier same-conversation
+context: **two Chardle fixes shipped, four shared-board ideas filed unbuilt.**
+Fixes: (1) resuming an already-open daily whose board sits in DMs no longer builds a
+broken guild-segment link and now tells the player it's stuck there because the board
+opened before the guild set a channel — `_resume` in `extensions/chardle.py` gained
+`is_dm`/`stale_dm`, derived by comparing the session's `board_channel_id` against the
+remembered guild thread (`ChardleChannelService.player_thread`). (2) a future
+`chardle_epoch` legitimately produces negative `puzzle_number`s (kept, not clamped, per
+owner instruction) but they no longer chain into `current_streak`/`longest_streak` —
+`stats.py`'s `player()` filters to `number >= 1` before streak math, leaving the
+`played`/`solved` totals untouched. Filed [[h-chardle-shared-board-modes]]: relocating an
+unbeaten daily's transport (and its result destination) after the fact, guesser-avatar
+attribution on shared channel/thread boards, a round-robin turn mode, and a per-player
+guess budget as an alternative to the shared pool — none designed, all flagged for later.
+Previously 2026-07-29. **Manual score import mechanics settled, nothing built** — [[h-manual-score-import-mechanics]]: single-entry first (bulk deferred), same `play_scores` table + `source='manual'` flag (no new table), linked accounts feed b30/r10/PTT same as t0 (no reconciliation), self-service, `/score add|delete|get` command group (not one flat `/addscore`). Fields are song/difficulty/score only. Duplicate rule: backend always allows overwrite including a lower score; the command layer must confirm before writing a lower score, higher score auto-replaces. Closes [[h-manual-score-import]]. Same session, `/recent`'s r10 friend-path gap settled — [[h-recent-config-r10-friend-path-omit]]: r10 omitted entirely (no placeholder) on friend-path scores, b30/ptt still shown; [[h-recent-config-ptt-b30-r10]] stays open only for the b30/ptt UI shape. Previously 2026-07-28. **`/run` owner terminal BUILT, same day it was designed** — `/config global` and `/reconcile` are deleted, `coda/ops/` holds the verb table, and the audience filter (`user_keys()`) closes the `/config view` leak that reading the code turned up. The no-coercion bug is fixed on both write paths. `chardle_timezone` became `timezone`: one clock now drives Chardle rollover and day/night jacket art. One item still open — the autocomplete replacement capture ([[h-run-terminal-build-time]] item 1). Same day, earlier: **Chardle reviewed end to end**, first pass over the shipped build. Seven findings, five fixed — the load-bearing one is that the clue-column selector was silently deleting `charter` from every tier and `artist` from all but `byd`, which also pinned board shape to 4 possibilities per tier. Previously 2026-07-27: **Chardle designed, not built** across three sessions the same day: initial design, then **guild race collapsed into free play** (race is no longer a mode), then an **edge-case sweep** that baked the owner's four manual notes into the pages and left one open question behind. The Wordle-over-the-catalog minigame comes from the archived Tenniel bot, revived on paper against coda-bot's structure. Tournaments and chardle are the two unbuilt modules. Previously 2026-07-24: live-updates poster BUILT, score tracking complete end to end. 100 pages.
 
 ## Key Recent Facts
 - **Visibility is not writability, and `settable_scopes` only answers the second** ([[h-config-audience-declared-on-key]], 2026-07-28). Four of `/config`'s five key-pickers filter on `settable_scopes` — which reads like a permission filter and isn't — and the fifth, `_KEYS_VIEW` (`extensions/config.py:25`), filters on nothing while `ConfigView` (`:245`) checks nothing. So `chardle_debug_board`, `chardle_epoch`, `chardle_abandon_hours`, `polling` are in every user's picker today, and deleting `/config global` closes neither the clutter nor the leak. Fix goes on the data: `audience: Literal["user","owner"]` on `ConfigKey`, every user-facing comprehension carries the predicate, default `"user"` so forgetting yields noise not a silent gate. One layer below the gate-on-the-service-not-the-command rule — that moved gates off the command onto the service, this moves them off the service onto the definition.
@@ -47,10 +94,16 @@ aliases: ["Recent Context", "Hot Cache"]
 - **Two off switches, different levels**: bot-wide `polling` config gates *fetching* (re-read every tick); per-account `tracking_enabled` gates *recording* (enforced only in `ScoreStore.ingest`). Neither stops on-demand refresh — that is why `/recent` works for an opted-out account, via `ObservationCache`.
 - **A third auth envelope exists** — HTTP 401 `UnauthorizedError` from server-side password rotation → `SessionExpired`. Captured 2026-07-18, one day after [[arcaea-auth-behavior]]'s window closes. Shipped in code, absent from that source.
 - [[arcaea-potential]] §7's CC-precision hedge is reversed by [[handoff-09-b30]] §3 — catalog CCs are exact, copied from the game.
-- **b30's read side is built** (2026-07-23): `B30Service.compute` in `src/coda/scores/b30.py`, no cache, no migration — reads `play_scores` fresh every call. See [[h-b30-cache-stores-sum]]. Source-agnostic (works for manual/t0 rows once [[h-manual-score-import]]'s write side exists, no changes needed to `b30.py` itself). No `/b30` command yet.
+- **b30's read side is built** (2026-07-23): `B30Service.compute` in `src/coda/scores/b30.py`, no cache, no migration — reads `play_scores` fresh every call. See [[h-b30-cache-stores-sum]]. Source-agnostic (works for manual/t0 rows once [[h-manual-score-import-mechanics]]'s write side exists, no changes needed to `b30.py` itself). No `/b30` command yet.
 - API-layer robustness fixes that postdate [[arcaea-api-layer]] (`TransportError`, 30 s request timeout, rate-limiter cancellation leak, and five more) are shipped in `src/coda/arcaea/` but only partly filed here — see [[arcaea]]. Read the code as authoritative there.
 
 ## Recent Changes
+- 2026-07-30: **Tournament bracket + chart-ban formats sketched (design target, not built)** — `Match`/`BanPhase` entity shapes, bracket-tree generation at roster-freeze, lazy grand-final reset, per-turn ban timeout. Filed [[h-tournament-bracket-and-ban-formats]]; edited [[tournaments|Tournaments]] (new "Format extensions" section). Updated [[index|Index]], [[log|Log]], [[hot|Hot Cache]].
+- 2026-07-30: **Chardle guess cooldown, attribution, sticky refresh settled and built** — 3s universal cooldown (no toggle), non-ephemeral chart-name guess replies, sticky refresh on finished-daily resume. Edited `extensions/chardle.py`, `chardle/guess.py`, `chardle/render.py`. Filed [[h-chardle-cooldown-and-attribution]]. Updated [[index|Index]], [[hot|Hot Cache]].
+- 2026-07-30: **`/chardle play` option rework settled and built** — `side` hidden not deleted, weighted random-tier (once per board), column count only (`3`-`8`), `room` moved first. Edited `chardle/tiers.py` (`RANDOM_TIER`, `_FREE_RANDOM_WEIGHTS`, `roll_random_tier`), `chardle/puzzle.py` (`free`/`_draw` gain `max_columns` + random-tier resolution), `chardle/columns.py` (`select_columns` gains `max_columns`), `extensions/chardle.py` (`Play` options + `invoke`). Filed [[h-chardle-play-options-settled]], closed [[h-chardle-play-options-rework]]. Updated [[index|Index]], [[hot|Hot Cache]].
+- 2026-07-30: **`/chardle play` option rework filed unbuilt** — drop `side`, random-tier option, column count/choice control. Filed [[h-chardle-play-options-rework]]. Updated [[index|Index]], [[hot|Hot Cache]].
+- 2026-07-30: **Chardle stale-DM resume fix + streak/pre-epoch fix shipped**; four shared-board ideas filed unbuilt. Edited `extensions/chardle.py` (`_resume`, `_post_daily_board`), `chardle/stats.py` (`player()`). Filed [[h-chardle-shared-board-modes]]. Updated [[index|Index]], [[hot|Hot Cache]].
+- 2026-07-29: **Manual score import mechanics + `/recent` r10 degradation settled**, nothing built. Filed [[h-manual-score-import-mechanics]] (closes [[h-manual-score-import]]) and [[h-recent-config-r10-friend-path-omit]]. Updated [[index|Index]], [[hot|Hot Cache]].
 - 2026-07-27: **Chardle edge-case sweep; four manual notes baked**, nothing built. Filed [[h-chardle-build-time-leftovers]]; edited [[catalog|Catalog]] (`byd_2` is a storage slot, not a class — classify as `byd` on every surface that compares or displays classes), [[chardle|Chardle]], [[chardle-module|chardle (module)]], [[h-chardle-boards-are-channel-owned]], [[h-chardle-puzzle-number-not-date]], [[h-chardle-err-is-an-event]], [[h-chardle-extra-pool-hides-class]], [[h-chardle-closest-match-always-costs]], [[d-chardle-dead-clue-columns]]. Notes baked: deterministic column order; err attempts `min(max(⌊N/2⌋,1),6)`; `byd_2` is a mechanism not a class; rollover 00:00+4 h at GMT+7 default. New decisions: private-thread dailies (+ `board_channel_id` split), answer-beats-cloak Rule 0. Smaller: calendar-derived numbering, candidate filtering before resolution, `ON DELETE RESTRICT` catalog FKs, `attempts:` ≥ 1, `/chardle play end` = starter or `MANAGE_MESSAGES`, stale dailies closed on invocation, free-play share string is self-describing and unnumbered.
 - 2026-07-27: **guild race collapsed into free play**, nothing built. Filed [[h-chardle-boards-are-channel-owned]]; edited [[chardle|Chardle]] (§Modes 4 rows → 3, expiry rule, eligibility), [[chardle-module|chardle (module)]] (session/puzzle schema, `open_session(owner=…, max_attempts=…)`, command list), [[h-chardle-puzzle-rows-not-modes]] (partly-superseded callout; the daily-as-race consequence flips to forbidden), [[h-chardle-puzzle-number-not-date]]. Attempts default to **null (free)**, bounded by `/chardle play attempts:<int>` — branching the default on DM-vs-guild was rejected as a hidden mode. Accepted costs: no two boards per busy channel without threads, a bounded board is griefable, abandoned boards hold a slot. The `wiki-sync` skill was deleted at the owner's request; this entry was written by the main thread.
 - 2026-07-27: **Chardle designed from the archived Tenniel prototype**, nothing built. Filed [[chardle|Chardle]], [[chardle-module|chardle (module)]], [[h-chardle-puzzle-rows-not-modes]], [[h-chardle-puzzle-number-not-date]], [[h-chardle-closest-match-always-costs]], [[d-chardle-dead-clue-columns]], [[h-chardle-board-rendering]]. Added `bpm`/`note` arrow clues (configured-never-built in the prototype), dropped the information-free jacket clue column, no free opener. Updated [[index|Index]], [[log|Log]].

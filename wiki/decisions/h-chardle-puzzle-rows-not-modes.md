@@ -66,7 +66,7 @@ column anywhere**. A mode is what a row looks like:
 Two things fall out for free rather than needing rules:
 
 - **A daily board is identical for everyone**, because the clue column set is frozen on
-  the *puzzle*, not rolled per session. The Tenniel prototype rolled columns in
+  the *puzzle*, not rolled per session. The 2024 prototype rolled columns in
   `Chardle.__init__` with `random`, which would have made a shared daily impossible. Only
   membership is frozen there — render order is a canonical constant, so two boards on the
   same puzzle agree column-for-column ([[chardle-clue-columns|Chardle — Clue Columns]]).

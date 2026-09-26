@@ -4,7 +4,7 @@ status: active
 source: arcaea-tournament-layer.md
 verified: 2026-07-17
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-30
 tags: [domain, arcaea, tournaments, unbuilt]
 ---
 
@@ -194,6 +194,25 @@ decision, 2026-07-17) — a correct model needs a manual per-player list that
 does not exist yet. See [[h-ownership-blob-open-before-building]] and
 [[handoff-11-ownership-blob|the ownership-blob sketch]] (handoff 11,
 sketch only, not designed) for the closest thing to a plan.
+
+## Format extensions (design target, not built)
+
+Everything above models **leaderboard/FFA only** — one round, everyone
+scored, ranked. A 2026-07-30 brainstorm sketched two additions not covered
+here: pairwise elimination brackets (single/double, best-of-N matches,
+explicit `winner_to`/`loser_to` pointers, lazy grand-final reset) and a
+player-facing chart-ban phase (upfront or per-game cadence, loser-priority
+turn order, random auto-ban timeout). Neither touches the "never calls the
+lowiro API" invariant — both are pure Discord-side state on top of the same
+round/game scoring primitive. See [[h-tournament-bracket-and-ban-formats]]
+for the pinned shape.
+
+A standalone 1v1 casual/ranked mode (Elo, matchmaking, HP-attrition match-end
+instead of best-of-N) is planned as a step *before* the full tournament
+module — it reuses the `Match`/`Game`/`BanPhase` primitives from
+[[h-tournament-bracket-and-ban-formats]] as a degenerate single-match
+bracket. See [[h-1v1-casual-ranked-structure]] for the sketch, filed
+2026-07-30.
 
 ## Source
 

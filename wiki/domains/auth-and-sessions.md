@@ -9,7 +9,6 @@ updated: 2026-07-21
 tags: [domain, arcaea, wire, auth, sessions]
 aliases: ["Auth & Sessions (lowiro wire)", "Auth & Sessions"]
 ---
-
 # Auth & Sessions (lowiro wire)
 
 ## Model
@@ -58,12 +57,6 @@ two:
 | `/webapi/*` generic | `{"success": false, "error_code": N}`, carried by HTTP 400 **and** 404 | Domain error; **status is noise, read the body** | FACT |
 | `/auth/login` rejection | HTTP 403 `{"error":{"name":"ForbiddenError","message":104}}` | Bad credentials — terminal | FACT |
 | `/webapi/*` session-dead (v2) | HTTP 401 `{"code":"UnauthorizedError","message":...}` | A **second** "session is dead" shape, captured 2026-07-18 (a day after the source doc's capture window) for a server-side password rotation | **Not in `arcaea-auth-behavior.md`** — see [[w-third-auth-envelope]] |
-
-> [!warning] may be reversed by handoffs
-> [[handoff-06-credentials-changed-server-side]] is being ingested by a parallel
-> agent and may formalize or extend this third-envelope behavior further (e.g. a
-> Bearer-token migration is explicitly flagged as a watch item in `CLAUDE.md`). Treat this
-> row as current-best-understanding, not final.
 
 `error_code` → exception mapping (`src/coda/arcaea/errors.py`):
 

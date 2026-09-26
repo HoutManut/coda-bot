@@ -16,7 +16,7 @@ Deliberately deferred on 2026-07-27 so the game's rules could be settled without
 renderer's constraints leaking into them. Everything else in [[chardle|Chardle]] is
 decided; this is not.
 
-The Tenniel prototype composited the board with Pillow: `header.png`, a per-guess row
+The 2024 prototype composited the board with Pillow: `header.png`, a per-guess row
 image, jacket art, side backgrounds, a flex-grow column layout (`FLEX_GROW` weights,
 `MIN_WIDTH = 220`) and a per-character font fallback (Mada → Noto Sans) for CJK titles.
 It looked like Arcaea. It also carried ~3 MB of assets, a Pillow dependency, per-guess CPU
@@ -88,6 +88,8 @@ owner's instruction. It is `chardle/render.py`: 🟩🟨🟥⬛ plus 🔼🔽, a
 line naming the board's columns in canonical order, and the pack label promoted to
 **mandatory on a non-unique title** exactly as rule 1 requires. The share string is
 the same grid, fenced into the finished board's own embed so it copies in one tap.
+
+Manual Note: that inline grid is temporary removed. Considering making it an action to reveal.
 
 It was **not legible enough on its own** — seven unlabelled emoji in a row do
 not say which column is which. A **debug view** (`chardle_debug_board`, default

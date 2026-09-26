@@ -8,7 +8,6 @@ updated: 2026-07-21
 tags: [decision, wire, errors]
 aliases: ["Branch on the response body, never the HTTP status"]
 ---
-
 # Branch on the response body, never the HTTP status
 
 ## Context

@@ -12,7 +12,6 @@ grade: A
 tags: [module, sessions, arcaea]
 aliases: ["sessions (module)"]
 ---
-
 # sessions
 
 ## Purpose

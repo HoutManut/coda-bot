@@ -8,11 +8,7 @@ tags: [meta, overview]
 aliases: ["coda-bot — Overview"]
 ---
 
-# coda-bot — Overview
-
-> [!warning] Stub
-> Written from `CLAUDE.md` at scaffold time, not from ingested sources. Every claim here is
-> re-derived and dated once the relevant source is ingested. See [[ingest-queue|Ingest Queue]].
+# coda-bot — Overview˝
 
 ## What it is
 

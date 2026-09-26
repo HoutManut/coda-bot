@@ -12,7 +12,6 @@ grade: A
 tags: [module, scores, wire]
 aliases: ["scores (module)", "scores"]
 ---
-
 # scores
 
 ## Purpose

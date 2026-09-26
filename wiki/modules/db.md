@@ -9,7 +9,6 @@ created: 2026-07-21
 updated: 2026-07-21
 tags: [module, db, persistence, postgres]
 ---
-
 # db
 
 ## Purpose

@@ -13,7 +13,7 @@ aliases: ["err is a dated event: guaranteed on April 1, 25% that week, 0.3% othe
 
 ## Context
 
-The Tenniel prototype hid an April Fools mode: a 0.6% roll on every `/chardle play`
+The 2024 prototype hid an April Fools mode: a 0.6% roll on every `/chardle play`
 swapped the pool to `err` charts and dropped `max_attempts` to 3. It was undated — the
 joke could fire in October — and the 3 was unexplained.
 

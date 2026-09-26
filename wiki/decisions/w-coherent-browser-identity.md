@@ -8,7 +8,6 @@ updated: 2026-07-21
 tags: [decision, wire, identity, cloaking]
 aliases: ["One fixed, internally-consistent Chrome identity per account — not per-request rotation", "Decision: Coherent Per-Account Browser Identity"]
 ---
-
 # One fixed, internally-consistent Chrome identity per account — not per-request rotation
 
 ## Context

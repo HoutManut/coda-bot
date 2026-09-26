@@ -8,7 +8,6 @@ created: 2026-07-21
 updated: 2026-07-27
 tags: [domain, arcaea, catalog]
 ---
-
 # Catalog
 
 ## Model
@@ -125,6 +124,10 @@ effective.field = difficulty.field   if explicitly set on the difficulty
 Overridable: `name_en`, `name_jp`, `artist`, `bpm`, `bpm_base`, `time`, `side`, `world_unlock`,
 `remote_download`, `bg`, `date`, `version`, `jacket`, `jacket_designer`.
 
+`world_unlock` is a catalog display field, not a player-ownership flag — for the
+owned/unlocked model (who has the song, which charts they can play), see
+[[ownership|Ownership]].
+
 Non-overridable (always difficulty-specific, never inherited, never shown at song level):
 `level`, `rating`, `note`, `chart_designer`.
 
@@ -143,6 +146,10 @@ per-chart link/alias controls.
 
 ## Traps
 
+- **Pack ownership ≠ player ownership**: this page's `pack` model is catalog/display
+  only (grouping, `pack_name`, `world_unlock`). Whether a *player* owns a song, and
+  which charts they've unlocked, is a separate model — see [[ownership|Ownership]].
+  Don't conflate "pack exists in catalog" with "pack owned by user."
 - **Level/CC sentinel collision**: both `level` and `rating` use `0`=TBA and `-1`=err-only-`?`
   as *distinct* meanings on the *same* stored integer — a naive "sentinel means missing" decode
   conflates them. See [[d-level-cc-sentinel-values]].

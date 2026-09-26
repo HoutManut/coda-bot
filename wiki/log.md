@@ -3,7 +3,7 @@ type: meta
 title: "Log"
 status: active
 created: 2026-07-21
-updated: 2026-07-29
+updated: 2026-07-30
 tags: [meta, log]
 aliases: ["Operations Log"]
 ---
@@ -11,6 +11,138 @@ aliases: ["Operations Log"]
 # Operations Log
 
 Append-only. Newest entry at the TOP.
+
+---
+
+## 2026-07-30 — 1v1 casual/ranked match structure sketched (design target, not built)
+
+Design session filed as [[h-1v1-casual-ranked-structure]], an in-between
+step before the full [[tournaments|Tournaments]] module. Reuses the
+`Match`/`Game`/`BanPhase` primitives from
+[[h-tournament-bracket-and-ban-formats]] as a degenerate single-match
+bracket (no WB/LB/GF routing). New pieces: Elo keyed on
+`arcaea_account_id` — named `Elo`, not `Rating`, to avoid colliding with
+play rating/PTT ([[potential]]) — flat K=32, updated on ranked `Match.DONE`
+only. Match-end condition is HP attrition (fixed HP=100, no game-count cap)
+rather than best-of-N: each game's score differential becomes damage to the
+loser, with chip damage on exact ties to guarantee the match can't
+stalemate forever. `SCALE_CONSTANT` (score-diff → damage) deliberately left
+untuned, needs live-testing. Chart selection: ranked reuses `BanPhase`
+per-game with loser-priority turn order; casual gets a lighter loser-priority
+single pick, no ban negotiation. Matchmaking is `/challenge` (direct invite)
+and `/queue` (FIFO pairing) side by side, deliberately no elo-range gating —
+population is under 50 people ([[coda-bot-scale-constraint]]), too small to
+gate pairing on rating proximity. Identity: Elo attaches to the
+`ArcaeaAccount`, not the Discord id — `current_account`'s existing
+one-discord-id-per-account invariant already makes alt accounts a
+non-issue, no new locking needed.
+
+---
+
+## 2026-07-30 — Tournament bracket + chart-ban formats sketched (design target, not built)
+
+Brainstorm on top of the existing leaderboard/FFA-only [[tournaments|Tournaments]]
+model, filed as [[h-tournament-bracket-and-ban-formats]]. Pins down a `Match`
+entity above the existing round/`Game` primitive for pairwise elimination
+brackets — best-of-N per match, explicit `winner_to`/`loser_to` pointers
+(not round/slot arithmetic), true double elimination with a lazily-created
+grand-final reset match (WB champion enters GF with zero losses; if LB
+champion wins GF1, both are tied at one loss and GF2 is created on the fly).
+Bracket generation happens once, at roster-freeze, reusing the existing
+roster-locks-at-`OPEN` invariant — bye handling and LB routing via the
+standard interleaved-round formula. Also sketches a chart-ban `BanPhase`
+(upfront or per-game cadence, chosen at creation; loser-priority turn order
+for per-game — upfront has no loser yet so falls back to seed order; random
+auto-ban on turn timeout) — the tournament layer's first player-facing
+interactive step, needing new machinery (a per-turn timeout ticker, a live
+select-menu interaction surface) that nothing else in the design needs.
+Neither addition touches the "never calls the lowiro API" invariant. Added
+a "Format extensions" section to [[tournaments|Tournaments]] pointing at the
+new page. Updated [[index|Index]].
+
+## 2026-07-30 — Chardle guess cooldown, attribution, and finished-daily sticky refresh settled and built
+
+[[h-chardle-shared-board-modes]] filed four unbuilt ideas earlier the same day; this pass
+settled and built three of them plus the widened refinement of a fourth, closed out via
+[[h-chardle-cooldown-and-attribution]]. **Sticky refresh on finished-daily resume**:
+`start_daily`'s existing-session branch (`extensions/chardle.py`) now calls `sticky.refresh`
+when resuming a `WON`/`LOST` daily into a guild — folds a result finished elsewhere (DM, no
+guild channel configured at the time) into that guild's scoreboard once touched there; a
+still-`PLAYING` resume is untouched. **Guess replies non-ephemeral, name the chart**:
+`Guess.invoke`'s `ctx.defer(ephemeral=True)` → `ctx.defer()` unconditionally; `_apply_guess`'s
+`Accepted` arm now resolves the chart via `facts.load_facts` and reports its name
+(`render.chart_label`, un-privated from `_chart_label` for the reuse) instead of generic
+"Guess recorded."/"Solved it." text. **Guess cooldown, 3 seconds, universal, no toggle**: new
+`Outcome.Cooldown(remaining: float)` in `chardle/guess.py`, enforced in `_apply_guess` before
+`guesses.submit` so a blocked attempt costs nothing; looks up the session's last guess by
+`ordinal DESC` (not `created_at`, to lean on the existing per-session ordinal invariant rather
+than clock ordering) and exempts the same `discord_id` unconditionally — applies to every
+session kind, no `is_daily` gate, no `Play` command option (the source page floated a toggle;
+dropped before build since the same-person exemption already makes it free on a solo board).
+`_on_reply` reacts ⏳ on a cooldown-blocked reply-guess. No migration — `ChardleGuess.discord_id`
+and `.created_at` already existed. Idea #1's original ask (relocating an *unbeaten* daily's
+transport mid-game) is untouched and is the only thing keeping
+[[h-chardle-shared-board-modes]] open. Edited `extensions/chardle.py`, `chardle/guess.py`,
+`chardle/render.py`. Updated [[index|Index]].
+
+---
+
+## 2026-07-30 — `/chardle play` option rework settled and built
+
+[[h-chardle-play-options-rework]] settled in a design pass and built the same session, closing
+it via [[h-chardle-play-options-settled]]. `side` hidden, not deleted — dropped from `Play`'s
+command options; `puzzles.free`/`_filters` keep the `side: int | None` param untouched, and the
+now-dead `_side_id`/`_SIDE_IDS` command-layer helpers were deleted. Random tier added:
+`tiers.RANDOM_TIER = "random"` is an extra `"Random"` choice on the existing `difficulty`
+picker, resolved once per board inside `PuzzleService.free` before the pool draw (frozen at
+creation, same timing as columns/answer), weighted `ftr .55/prs .15/pst .1/extras .1/byd
+.05/etr .05` (`_FREE_RANDOM_WEIGHTS`) — extras' wider share off the daily's shape splits three
+ways since free play offers `byd`/`etr` separately. `err` gets no entry in that table: mid-design
+it turned up that `roll_err`'s ambient/event chance already fires inside `PuzzleService.free` on
+every free-play call, explicit-tier or random alike, so nothing new was needed there. Columns:
+count only (explicit choice deferred, still blocked on [[h-chardle-board-rendering]]) — new
+`columns` integer option (`min=3, max=8, default=MAX_COLUMNS`) threaded through
+`PuzzleService.free`/`_draw` into `columns.select_columns` as `max_columns`. `room` moved to
+`Play`'s first option. Edited `chardle/tiers.py`, `chardle/puzzle.py`, `chardle/columns.py`,
+`extensions/chardle.py`. Updated [[index|Index]], [[hot|Hot Cache]].
+
+---
+
+## 2026-07-30 — `/chardle play` option rework filed unbuilt
+
+Owner flagged three changes to `Play`'s options (`extensions/chardle.py:457-497`): remove
+`side` (no reasoning captured, just the instruction); add a random-tier option (rolling
+granularity — per-board vs per-refresh — and whether it's uniform or pool-size-weighted across
+`tiers.playable_names()`, both unsettled); and column count and/or explicit column choice as
+an alternative to `columns.select_columns`'s always-random roll up to `MAX_COLUMNS = 7`. Filed
+[[h-chardle-play-options-rework]], nothing built. Updated [[index|Index]], [[hot|Hot Cache]].
+
+---
+
+## 2026-07-30 — Chardle stale-DM resume fix, pre-epoch streak fix, four ideas filed unbuilt
+
+Reported bug: resuming a daily whose board opened in DMs (no guild channel configured yet)
+kept landing in DMs even after the guild set a channel — traced to `_daily_flow` in
+`extensions/chardle.py` resuming an existing `PLAYING` session at its original
+`board_channel_id` without re-resolving transport, which is correct (an already-posted board
+can't move), but `_resume` built its message link with the invoking guild's id regardless,
+producing a broken `discord.com/channels/<guild>/<dm-channel>/...` URL and no explanation.
+Fixed: `_resume` now takes `is_dm`/`stale_dm`, derived by comparing the session's
+`board_channel_id` against `ChardleChannelService.player_thread`; the link drops the guild
+segment for a DM board, and a note explains why the board stayed in DMs. `_post_daily_board`
+now returns whether the freshly resolved destination is a DM alongside the channel/message ids.
+
+Separately, owner confirmed a future `chardle_epoch` producing negative `puzzle_number`s is
+intentional test setup and must stay uncoerced — but those pre-epoch dailies shouldn't chain
+into a streak. `stats.py::player()` now filters to `number >= 1` before computing
+`current_streak`/`longest_streak`; `played`/`solved` totals are computed from the unfiltered
+list, unaffected.
+
+Filed [[h-chardle-shared-board-modes]] for four ideas raised in the same conversation, none
+designed: relocating an unbeaten daily's transport (carrying the result destination with it),
+guesser-avatar attribution on shared channel/public-thread boards, a round-robin turn mode,
+and a per-player guess budget as an alternative to the shared attempt pool. Updated
+[[index|Index]] (Questions — open table, page count, summary), [[hot|Hot Cache]].
 
 ---
 

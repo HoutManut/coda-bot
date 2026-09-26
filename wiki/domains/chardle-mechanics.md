@@ -1,7 +1,7 @@
 ---
 type: domain
 status: active
-source: Tenniel prototype (`classes/chardle.py`, `plugins/chardle.py`, 2024-09/10, archived outside this repo) + design session 2026-07-27
+source: 2024 prototype (`classes/chardle.py`, `plugins/chardle.py`, 2024-09/10, archived outside this repo) + design session 2026-07-27
 verified: 2026-07-28
 created: 2026-07-29
 updated: 2026-07-29

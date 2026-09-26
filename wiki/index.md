@@ -3,14 +3,40 @@ type: meta
 title: "Index"
 status: active
 created: 2026-07-21
-updated: 2026-07-29
+updated: 2026-07-30
 tags: [meta, index]
 aliases: ["coda-bot Wiki — Master Catalog"]
 ---
 
 # coda-bot Wiki — Master Catalog
 
-106 pages. **`domains/chardle.md` and `flows/live-updates.md` split into overview + 3
+120 pages. **1v1 casual/ranked match structure sketched 2026-07-30** (design
+target, not built) — an in-between step before the full tournament module:
+Elo keyed on `arcaea_account_id` (named `Elo` not `Rating`, avoiding the
+play-rating/PTT name collision), HP-attrition match-end (score-differential
+damage, chip damage on exact ties to prevent stalemate) instead of
+best-of-N, `Match`/`Game`/`BanPhase` reused from
+[[h-tournament-bracket-and-ban-formats]] as a degenerate single-match
+bracket, challenge + queue matchmaking with no elo-range gating (population
+too small to gate on). See [[h-1v1-casual-ranked-structure]]. Same day, earlier: **Chardle guess cooldown, non-ephemeral chart-name replies, and finished-daily
+sticky refresh settled AND built 2026-07-30** — 3s universal cooldown (no `Play` toggle, same
+person always exempt), every guess reply drops `ephemeral` and names the chart, a daily
+finished elsewhere now folds into a guild's scoreboard on resume — see
+[[h-chardle-cooldown-and-attribution]], leaving only the original relocation-while-unbeaten
+ask open on [[h-chardle-shared-board-modes]]. Same day, earlier: **`/chardle play` option rework settled AND built** — `side`
+hidden not deleted, weighted random-tier resolved once per board (err needs no new
+handling, already covered by `roll_err`'s existing ambient/event chance), column
+count only (`3`-`8`), `room` moved first — see [[h-chardle-play-options-settled]],
+closing [[h-chardle-play-options-rework]]. Same day, earlier: Chardle daily stale-DM resume message
+fixed, and four unbuilt shared-board ideas filed (relocation while unbeaten, guesser
+avatar attribution, round-robin mode, per-player guess budget) — see
+[[h-chardle-shared-board-modes]]. Previously 2026-07-29. **Manual score import mechanics settled 2026-07-29** — single-entry
+first (bulk deferred), same `play_scores` table + `source` flag, linked accounts
+feed b30 same as t0, self-service `/score add|delete|get` command group, lower-score
+overwrite needs command-layer confirmation — see [[h-manual-score-import-mechanics]],
+closing [[h-manual-score-import]]. Same session, `/recent` r10 friend-path gap settled:
+omitted entirely, no placeholder — see [[h-recent-config-r10-friend-path-omit]].
+**`domains/chardle.md` and `flows/live-updates.md` split into overview + 3
 sub-pages each 2026-07-29**, following the 2026-07-29 lint pass's over-300-line findings —
 see [[log|Log]]. **`/run` owner terminal designed AND built 2026-07-28** — two decisions, one gotcha, one question (item 1 of which is still open); the trigger was "delete `/config global`", and reading the code found the leak is `/config view` instead. Chardle designed 2026-07-27 from the archived Tenniel prototype — one domain page, one planned module, six decisions, one gotcha, two open questions; nothing built. Its edge-case sweep the same day baked four owner manual notes into the pages and left [[h-chardle-build-time-leftovers]] behind. All 16 Layer-1 documents ingested 2026-07-21; `scores/` + its two flows filed 2026-07-22 from shipped code. Dead links closed 2026-07-23 — see [[hot|Hot Cache]] §Lint status. Four surface-feature questions + the t0 manual-tier decision filed 2026-07-23 from conversation. **b30 backend built 2026-07-23** — see [[h-b30-cache-stores-sum]] and [[scores]]. Poll-schedule phase-vs-absolute gotcha + rate-limit-shape question filed 2026-07-24 during a docstring cleanup pass.
 
@@ -23,6 +49,7 @@ see [[log|Log]]. **`/run` owner terminal designed AND built 2026-07-28** — two
 | Page | Covers |
 |---|---|
 | [[catalog\|Catalog]] | Songs, difficulties, packs, level `×2`/`×2+1`/`-1` encoding, CC `×10`, override resolution |
+| [[ownership\|Ownership]] | Not-owned/owned/unlocked three-state model, `packs`/`singles`/`world_songs` wire lists, `single`/`extend_*` pack exceptions, passive per-chart unlock derivation |
 | [[scoring\|Scoring]] | Score formula, pure/far/lost, grades, `clear_type`/`modifier`, gauge |
 | [[potential\|Potential]] | Play rating, b30/r10, PTT `×100`, hidden sentinel, recent-30 admission |
 | [[score-mapping\|Score Mapping]] | Wire `(song_id, difficulty)` → `song_difficulties`, difficulty ints, `byd_2` |
@@ -92,10 +119,12 @@ Not yet written: `catalog`, `settings`, `extensions`, `admin`, `approvals`, `uti
 - [[h-no-orm-relationships|No `relationship()` anywhere; joins are explicit]]
 - [[h-t0-manual-tier-b30|t0: no account link, manual-only score entry, b30 computed from it]]
 - [[h-b30-cache-stores-sum|b30 backend: on-demand compute, no cache; configurable limit; source-agnostic]]
+- [[h-manual-score-import-mechanics|Manual score import: single-entry first, same table + flag, feeds b30 same as t0, self-service `/score` group]] (**not built**)
 
 **Discord surface**
 - [[h-owner-surface-is-run-terminal|Owner-only operations live behind one `/run` terminal, not owner-gated slash options]] (**not built**)
 - [[h-config-audience-declared-on-key|A config key declares its own audience; every user-facing picker filters on it]] (**not built**)
+- [[h-recent-config-r10-friend-path-omit|`/recent` rating-impact config: friend-path scores omit r10 entirely, no placeholder]] (**not built**)
 
 **Chardle**
 - [[h-chardle-puzzle-rows-not-modes|A Chardle mode is a shape of rows, not a class]] (partly superseded)
@@ -104,6 +133,8 @@ Not yet written: `catalog`, `settings`, `extensions`, `admin`, `approvals`, `uti
 - [[h-chardle-closest-match-always-costs|Ambiguous guesses resolve to the answer if possible, else to the closest match — and always cost an attempt]]
 - [[h-chardle-extra-pool-hides-class|The extras pool merges Beyond and Eternal and reveals only "Extra"]]
 - [[h-chardle-err-is-an-event|`err` is a dated event: guaranteed April 1, 25% that week, 0.3% otherwise, never a random daily]]
+- [[h-chardle-play-options-settled|`/chardle play`: `side` hidden not deleted, weighted random-tier frozen per board, column count only, `room` first]] (**built**)
+- [[h-chardle-cooldown-and-attribution|Guess cooldown (3s, universal, no toggle), non-ephemeral chart-name replies, sticky refresh on finished-daily resume]] (**built**)
 
 ## Questions — open
 
@@ -112,14 +143,18 @@ Not yet written: `catalog`, `settings`, `extensions`, `admin`, `approvals`, `uti
 | [[h-ownership-blob-open-before-building\|What must settle before the ownership blob is built?]] | ownership blob, chart-unlock display |
 | [[h-tournament-attempt-overhead\|How long is song-select → load → results, really?]] | tournaments |
 | [[h-tournament-clock-skew\|How far does the bot's clock skew from lowiro's?]] | tournaments |
-| [[h-recent-config-ptt-b30-r10\|Should /recent be configurable to show ptt/b30/r10 impact?]] | /recent rating-impact config |
+| [[h-recent-config-ptt-b30-r10\|Should /recent be configurable to show ptt/b30/r10 impact?]] | /recent rating-impact config (r10 friend-path degradation now settled — see [[h-recent-config-r10-friend-path-omit]]) |
 | [[h-r30-queue-view\|What does a comprehensive r30 queue view need?]] | /r30 command |
-| [[h-manual-score-import\|What does manual score importing need before it can be built?]] | manual score import feature |
 | [[h-course-mode-ptt-detection\|How do we detect a play was made in course mode, so it can be excluded from PTT?]] | b30/r10 backend correctness, score ingest |
 | [[h-real-rate-limit-shape-unknown\|What does a real rate limit or Cloudflare challenge from lowiro actually look like?]] | removing `arcaea/client.py`'s temporary diagnostic-logging block |
 | [[h-chardle-board-rendering\|How is a Chardle board rendered?]] | chardle — every other rule is settled |
 | [[h-chardle-build-time-leftovers\|What is still unsettled in Chardle at build time?]] | chardle — sweep policy, `bpm`/`note` thresholds, ephemeral fallback, answer-deletion path (private-thread item answered 2026-07-27) |
 | [[h-run-terminal-build-time\|What is still unsettled about `/run` before it is built?]] | `/run`, settings — autocomplete replacement capture, the `set_value` no-coercion bug, first verb set, DM `contexts`, audience for the existing 11 keys |
+| [[h-world-songs-id-mapping\|How do `world_songs` ids on `/user/me` map to `song_id`?]] | ownership World Mode resolution |
+| [[h-passive-unlock-model-unsettled\|Is score-row-as-evidence the complete chart-unlock model, or does it need an explicit unlock table too?]] | tournaments, ownership chart-unlock tracking |
+| [[h-chardle-shared-board-modes\|What should Chardle's daily relocation and public-board modes look like?]] | chardle — only player-initiated relocation while unbeaten still open; attribution, guess cooldown, and finished-daily sticky refresh built 2026-07-30, see [[h-chardle-cooldown-and-attribution]] |
+| [[h-tournament-bracket-and-ban-formats\|What should bracket + chart-ban tournament formats look like?]] | tournament module build — leaderboard/FFA shape already designed, bracket + bans are net-new |
+| [[h-1v1-casual-ranked-structure\|What should the 1v1 casual/ranked match structure look like?]] | 1v1 module build — planned before the full tournament module; Elo, matchmaking, HP-attrition match-end, `SCALE_CONSTANT` still needs empirical tuning |
 
 ## Questions — answered
 
@@ -131,8 +166,10 @@ Not yet written: `catalog`, `settings`, `extensions`, `admin`, `approvals`, `uti
 | [[h-credentials-changed-server-side\|Can a stored credential go stale server-side?]] | Already resolved 2026-07-18 in `errors.py`/[[w-third-auth-envelope]] — just never cross-linked; handling is correct as shipped |
 | [[h-welcome-message-update\|What should the post-registration welcome message say now?]] | Shipped 2026-07-23 in `_send_welcome` — explicit tracking-on/live-updates-off callout, inline enable button when the channel is allowlisted |
 | [[h-live-update-post-filters\|What filters decide whether a play is worth posting?]] | Triggers OR-ed (`all`/`pb`/`bX`/`pm`/`fr`/`grade_up`), gates AND-ed (`min_level` + per-channel guild floor); per-user columns on `live_update_prefs`; default `pb`; b30 aggregate never printed. **Built 2026-07-24** in `scores/filters.py` — 2026-07-24 |
+| [[h-chardle-play-options-rework\|What should /chardle play's option set become?]] | Settled and built same day by [[h-chardle-play-options-settled]]: `side` hidden not deleted, weighted random-tier frozen once per board, column count only (`3`-`8`), `room` moved first — 2026-07-30 |
 | [[h-recent-duplicate-suppression\|Suppress or merely delay a play `/recent` already showed?]] | Suppress. `/recent` *causes* the duplicate by triggering the poll; marker keyed `(destination, play_score_id)`, TTL 15 min. **Built 2026-07-24** in `scores/suppression.py` — 2026-07-24 |
 | [[h-catalog-schema-open-questions\|What is unresolved in the catalog schema design?]] | 12/14 override fields used (name_jp, remote_download never fire); artist/charter seeded automatically in `seed.py`; search-config still placeholder values, never tuned; `packs.release_date` is manual-only, not derived — 2026-07-23 |
+| [[h-manual-score-import\|What does manual score importing need before it can be built?]] | Settled by [[h-manual-score-import-mechanics]]: single-entry first, same table + flag, linked accounts feed b30 like t0, self-service `/score add\|delete\|get` group — 2026-07-29 |
 
 ## Sources — archived originals
 
