@@ -1,7 +1,7 @@
 ---
 type: domain
 status: active
-source: Tenniel prototype (`classes/chardle.py`, `plugins/chardle.py`, 2024-09/10, archived outside this repo) + design session 2026-07-27
+source: 2024 prototype (`classes/chardle.py`, `plugins/chardle.py`, 2024-09/10, archived outside this repo) + design session 2026-07-27
 verified: 2026-07-28
 created: 2026-07-29
 updated: 2026-07-29
@@ -138,7 +138,7 @@ Added by the revival:
 
 ## Prototype provenance
 
-The Tenniel implementation (`classes/chardle.py`, 799 lines) is the source for the clue
+The 2024 prototype implementation (`classes/chardle.py`, 799 lines) is the source for the clue
 semantics and the feedback thresholds in [[chardle-clue-columns|Chardle — Clue Columns]].
 What it got right is kept. What it got wrong is recorded so the port does not reproduce it:
 
@@ -149,7 +149,7 @@ What it got right is kept. What it got wrong is recorded so the port does not re
 | `fuzzy_search(...)[:2]`, `reverse()`, arbitrary pick | Superseded by `catalog.search.SearchService` |
 | No sentinel guard on level/CC | Delisted and TBA charts poison arrow arithmetic |
 | Answer leaked to a hardcoded debug channel | `1285895916863098920`, unconditional |
-| `play_cost` / `base_reward` / currency economy | Tenniel had a currency. coda-bot has none; dropped entirely |
+| `play_cost` / `base_reward` / currency economy | The 2024 prototype had a currency. coda-bot has none; dropped entirely |
 | `max_attempts` 5 in config, 10 in code | Code overrode its own config |
 
 ## Related

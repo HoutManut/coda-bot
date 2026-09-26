@@ -8,7 +8,6 @@ updated: 2026-07-28
 tags: [question, chardle]
 aliases: ["What is still unsettled in Chardle at build time?"]
 ---
-
 # What is still unsettled in Chardle at build time?
 
 ## Why it is open

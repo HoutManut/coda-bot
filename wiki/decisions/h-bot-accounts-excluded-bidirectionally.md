@@ -8,7 +8,6 @@ updated: 2026-07-21
 tags: [decision, bot-accounts, registration, seeding]
 aliases: ["Bot accounts are excluded from the player pool in both directions"]
 ---
-
 # Bot accounts are excluded from the player pool in both directions
 
 ## Context

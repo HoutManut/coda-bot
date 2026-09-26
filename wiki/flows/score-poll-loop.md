@@ -10,7 +10,6 @@ grade: A
 tags: [flow, scores, wire]
 aliases: ["Score Poll Loop", "score-poll-loop", "Poll Loop"]
 ---
-
 # Score Poll Loop
 
 ## Trigger

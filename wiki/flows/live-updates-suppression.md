@@ -10,7 +10,6 @@ grade: A
 tags: [flow, live-updates, score-tracking]
 aliases: ["Live Updates Suppression", "Live Updates — Suppression", "/recent Duplicate Suppression"]
 ---
-
 # Live Updates — Suppression
 
 Split out of [[live-updates|Live Updates (poster)]] 2026-07-29 (that page had grown past the

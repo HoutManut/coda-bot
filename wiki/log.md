@@ -1592,7 +1592,7 @@ Housekeeping this session: the `wiki-sync` skill was deleted at the owner's requ
 
 ## 2026-07-27 — DESIGN: Chardle revival
 
-Read the archived **Tenniel** prototype (`classes/chardle.py`, 799 lines;
+Read the archived **2024** prototype (`classes/chardle.py`, 799 lines;
 `plugins/chardle.py`, 77; `assets/chardle/`; the `games.chardle` block of
 `assets/config.json`) and designed a revival against coda-bot's structure. **Nothing
 built** — no `src/coda/chardle/`, no tables, no commands.

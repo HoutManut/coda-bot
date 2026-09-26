@@ -9,7 +9,6 @@ created: 2026-07-21
 updated: 2026-07-21
 tags: [module, players, registration]
 ---
-
 # players
 
 ## Purpose
@@ -61,16 +60,6 @@ wire (`reserved.py`), the durable owner-approval flow for a contested code claim
   `BotAccount` (read-only from this package's perspective, owned by `sessions/`).
 
 ## Related callouts
-
-> [!warning] may be reversed by handoffs
-> The owner-approval / ownership-provenance flow (`NeedsApproval`, `ProvenOverCode`,
-> `ProvenCoexists`, `link_approval.py`) and the bot-code fake-not-found retirement in
-> `reserved.py` both **already reflect** handoffs 01, 02 and 05 per this
-> package's own docstrings — they are the built state, not a stale claim. A parallel ingest
-> agent is processing the handoff notes directly; if that ingest surfaces anything this
-> page does not yet reflect (e.g. further changes described in
-> [[handoff-06-credentials-changed-server-side]] or [[handoff-11-ownership-blob]]), that
-> ingest's pages win over this one per `wiki/meta/conventions.md`'s precedence order.
 
 ## Related
 

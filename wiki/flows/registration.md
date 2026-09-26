@@ -9,7 +9,6 @@ verified: 2026-07-29
 grade: A
 tags: [flow, registration, arcaea]
 ---
-
 # Registration
 
 ## Trigger
@@ -17,14 +16,6 @@ tags: [flow, registration, arcaea]
 `/register` — an ephemeral slash command that opens a modal (never a plain text arg, so a
 friend code or a password never lands in the visible command bar). Two independent methods,
 `code` and `account`; both funnel into `RegistrationService`.
-
-> [!warning] may be reversed by handoffs
-> This page describes the flow **as built**, which already incorporates handoffs 01/02
-> (owner-approval, ownership provenance) and 05 (dropping the fake-not-found oracle) per
-> `players/service.py` and `players/reserved.py`'s own docstrings. A parallel ingest agent
-> is processing the handoff notes directly and may have finer detail or catch a further
-> reversal this page does not yet reflect (`06-credentials-changed-server-side.md` in
-> particular, given [[w-third-auth-envelope]]).
 
 ## Path — friend-code method
 

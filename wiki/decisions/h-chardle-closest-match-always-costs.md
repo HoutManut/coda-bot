@@ -21,7 +21,7 @@ button-per-song pick, and `/song` presents it. Chardle cannot simply reuse that 
 a modal pick mid-guess is friction, and the interaction cost is paid on every ambiguous
 title.
 
-The Tenniel prototype had a half-answer. `submit` iterated candidates and `break`'d on
+The 2024 prototype had a half-answer. `submit` iterated candidates and `break`'d on
 `entry == self.answer` — generous when the guess *was* right. The other branch was the
 bug: ambiguous with no candidate matching, it compared against whichever candidate the
 loop happened to leave bound, printed that row's arrows, and charged an attempt. Wrong

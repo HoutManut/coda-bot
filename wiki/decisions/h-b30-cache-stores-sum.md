@@ -8,7 +8,6 @@ updated: 2026-07-23
 tags: [decision, scores, b30, unbuilt-no-longer]
 aliases: ["b30 backend: on-demand compute, no cache; configurable limit; source-agnostic"]
 ---
-
 # b30 backend: on-demand compute, no cache; configurable limit; source-agnostic
 
 ## Context

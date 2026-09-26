@@ -8,7 +8,6 @@ updated: 2026-07-21
 tags: [decision, registration, reserved-codes]
 aliases: ["Refuse a bot-account friend code honestly, not with a mimicked not-found"]
 ---
-
 # Refuse a bot-account friend code honestly, not with a mimicked not-found
 
 ## Context

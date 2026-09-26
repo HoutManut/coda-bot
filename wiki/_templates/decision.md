@@ -7,7 +7,6 @@ created:
 updated:
 tags: [decision]
 ---
-
 # <Decision, stated as the rule>
 
 ## Context

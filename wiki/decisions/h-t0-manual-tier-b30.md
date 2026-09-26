@@ -8,7 +8,6 @@ updated: 2026-07-23
 tags: [decision, scores, potential, registration, unbuilt]
 aliases: ["t0 tier: no account link, manual score import only, b30 computed from it"]
 ---
-
 # t0: no account link, manual-only score entry, b30 computed from it
 
 ## Context

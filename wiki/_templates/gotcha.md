@@ -8,8 +8,7 @@ created:
 updated:
 tags: [gotcha]
 ---
-
-# <Trap name>
+# <Trap name,>
 
 ## Symptom
 

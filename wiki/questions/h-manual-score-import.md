@@ -1,10 +1,10 @@
 ---
 type: question
-status: open
+status: closed
 blocks: ["manual score import feature"]
 source: conversation 2026-07-23
 created: 2026-07-23
-updated: 2026-07-23
+updated: 2026-07-29
 tags: [question, scores, potential, unresearched]
 aliases: ["What does manual score importing need before it can be built?"]
 ---
@@ -58,6 +58,11 @@ here is purely the *write* side: how a manual row (and, prior to that, a t0
 
 ## Answer
 
-Not yet fully answered — see [[h-t0-manual-tier-b30]] for the part that is.
-The b30-consumption half is answered ([[h-b30-cache-stores-sum]]); the
-row-creation mechanics below are not.
+**2026-07-29**: settled by [[h-manual-score-import-mechanics]] — single-entry
+first (bulk deferred), same `play_scores` table + `source` flag, linked
+accounts feed b30 same as t0 (no reconciliation), self-service entry.
+Combined with [[h-t0-manual-tier-b30]] (tier concept + b30-inclusion policy)
+and [[h-b30-cache-stores-sum]] (read side already source-agnostic), the
+design is settled. Still not built: the `/addscore`-style command and its
+validation. Closing this question; remaining work is implementation, not
+open design.

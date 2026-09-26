@@ -1,7 +1,7 @@
 ---
 type: domain
 status: active
-source: Tenniel prototype (`classes/chardle.py`, `plugins/chardle.py`, 2024-09/10, archived outside this repo) + design session 2026-07-27
+source: 2024 prototype (`classes/chardle.py`, `plugins/chardle.py`, 2024-09/10, archived outside this repo) + design session 2026-07-27
 verified: 2026-07-28
 created: 2026-07-27
 updated: 2026-07-29
@@ -14,7 +14,7 @@ aliases: ["Chardle"]
 **Status: BUILT 2026-07-27.** `src/coda/chardle/`, the three tables (migration
 `a97f24335635`) and `/chardle` all exist. The renderer is the **emoji/text** option
 from [[h-chardle-board-rendering]], shipped as the temporary frontend. A working
-prototype shipped in the **Tenniel** bot (2024), and this design was revived from
+prototype shipped in an earlier bot (2024), and this design was revived from
 reading it — see [[chardle-mechanics|Chardle — Mechanics]] §Prototype provenance. Module
 shape lives in [[chardle-module|chardle (module)]].
 
@@ -114,7 +114,7 @@ participant free to log a solo 1/6.
 The Chardle channel, the daily scoreboard, and the transport chain a board falls back
 through (thread → DM → ephemeral) are covered on
 [[chardle-discord-surface|Chardle — Discord Surface]]. The answer pool, lifetime stats,
-standing rules, and the Tenniel prototype-comparison table are covered on
+standing rules, and the 2024 prototype-comparison table are covered on
 [[chardle-mechanics|Chardle — Mechanics]].
 
 ## Related
