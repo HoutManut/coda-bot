@@ -1,12 +1,12 @@
 ---
 type: gotcha
-status: active
+status: superseded
 severity: high
 area: wire
 verified: 2026-07-17
 created: 2026-07-21
-updated: 2026-07-21
-tags: [gotcha, potential, wire]
+updated: 2026-08-28
+tags: [gotcha, potential, wire, pre-7.0]
 aliases: ["r10 cannot be reconstructed on the friend path — even approximately. b30 can."]
 ---
 
@@ -56,3 +56,17 @@ b30 on any tier. Gate r10 (and by extension any PTT figure that depends on it) b
 An r10 or PTT value rendered for a player known to be tier-1 (friend-path only, no linked
 credentials); a support report of "my recent shows something the game doesn't" that traces back
 to a friend-path-derived recent-30 pool.
+
+## 2026-08-28 update — SUPERSEDED
+
+**DEV-STATED** (official `@arcaea_en` tweet, [[arcaea-7.0-potential-notes]]): Arcaea 7.0 removed
+r10 from the potential formula entirely. This page's specific mechanism (r10's asymmetric
+recent-30 admission rule, and the friend path's inability to see `clear_type`/`modifier`) is
+retired along with it — there is no more r10 to reconstruct, on any path.
+
+Kept, not deleted: the *reasoning* here is the direct ancestor of a live, unresolved question.
+7.0 added a clear-status play-rating bonus (item 4 of [[h-7.0-potential-rework]]), and if that
+bonus keys off `clear_type` the same way r10's admission rule did, the **replacement** best-50
+pool inherits this exact gap — a different mechanic, the same "own-credentials-only field the
+friend path structurally cannot see" shape. See [[potential|Potential]] §Traps for the current
+framing of that open question.

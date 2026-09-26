@@ -54,8 +54,12 @@ def _header(grid: layout.Grid) -> Image.Image:
 def _row(row: BoardRow, grid: layout.Grid) -> Image.Image:
     facts = row.facts
     beyond = facts.visible_class is DifficultyClass.BYD
-    plate = assets.stretch(assets.plate(facts.side, beyond=beyond), grid.width)
-    _paste_jacket(plate, row)
+    plate = assets.stretch(
+        assets.plate(facts.song_id, facts.side, beyond=beyond, alt=facts.alt),
+        grid.width,
+    )
+    if facts.song_id not in assets.BAKED_IN:
+        _paste_jacket(plate, row)
     for index, (clue, cell) in enumerate(zip(grid.columns, row.cells, strict=True)):
         _paste_cell(plate, grid.bounds(index), clue, cell, row)
     return plate
@@ -75,6 +79,10 @@ def _paste_cell(
     cell: Cell,
     row: BoardRow,
 ) -> None:
+    # A baked-in plate owns its title cell outright: a wash over it would tint
+    # the art's own lettering.
+    if clue is Clue.TITLE and row.facts.song_id in assets.BAKED_IN:
+        return
     left, right = bounds
     wash = assets.wash(cell, right - left - 2 * layout.WASH_INSET)
     if wash is not None:

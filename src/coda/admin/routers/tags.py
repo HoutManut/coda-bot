@@ -314,6 +314,7 @@ async def tag_detail(
                 SongDifficulty.id,
                 SongDifficulty.song_id,
                 SongDifficulty.difficulty,
+                SongDifficulty.alt,
                 func.coalesce(SongDifficulty.name_en, Song.name_en).label("name"),
                 Song.idx,
             )

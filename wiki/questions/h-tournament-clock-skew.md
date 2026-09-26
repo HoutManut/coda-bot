@@ -4,7 +4,7 @@ status: open
 blocks: []
 source: arcaea-tournament-layer.md
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 tags: [question, tournaments, wire, low-priority]
 aliases: ["How much does the bot's clock skew from lowiro's server clock?"]
 ---
@@ -23,7 +23,7 @@ untested. Both are presumably NTP-synced, so the skew is expected to be
 small, but "presumably" is not a measurement.
 
 The source doc marks this explicitly as **"worth knowing, not blocking"** —
-window durations floor at 100s (`clamp(2t, 100s, 5m)`), which is far above
+window durations start at 200s (`clamp(2t, 200s, 500s)`), which is far above
 any plausible NTP skew, so nothing in the current design is fragile to it.
 
 ## What would answer it

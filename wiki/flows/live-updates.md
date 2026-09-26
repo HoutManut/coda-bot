@@ -256,6 +256,6 @@ Five places where the code is more specific than the design above:
 [[live-updates-suppression|Live Updates — Suppression]] ·
 [[scores|scores (module)]], [[score-poll-loop|Score Poll Loop]],
 [[chart-resolution|Chart Resolution]], [[db]] (`play_scores`, `player_links`,
-`live_update_channels`, `live_update_prefs`), [[b30]] (feeds `bX`),
+`live_update_channels`, `live_update_prefs`), [[potential|Potential]] (feeds `bX`),
 [[registration|Registration]], [[h-live-update-post-filters]],
 [[h-recent-duplicate-suppression]], [[handoff-08-live-updates-poster]] (source)

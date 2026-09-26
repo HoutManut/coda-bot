@@ -21,6 +21,19 @@ CLASS_COLORS: dict[DifficultyClass, int] = {
 SIDE_COLORS: dict[Side, int] = {
     Side.LIGHT: 0x2EA2C0,
     Side.CONFLICT: 0x391749,
-    Side.COLORLESS: 0xEAE9E0,
+    Side.ACHROMIC: 0xEAE9E0,
     Side.LEPHON: 0xEAE9E0,
+    Side.DARK_LEPHON: 0x514786,
 }
+
+ALT_CLASS_COLORS: dict[DifficultyClass, int] = {
+    DifficultyClass.BYD: 0x0C2065,
+    DifficultyClass.BYD_2: 0x0C2065,
+}
+
+
+def class_color(difficulty: DifficultyClass, alt: bool = False) -> int:
+    """A difficulty class's colour, or its alt appearance's colour when flagged."""
+    if alt and difficulty in ALT_CLASS_COLORS:
+        return ALT_CLASS_COLORS[difficulty]
+    return CLASS_COLORS[difficulty]

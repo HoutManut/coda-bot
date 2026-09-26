@@ -32,14 +32,16 @@ def test_emit_before_loop_buffers_without_error() -> None:
     handler = DiscordChannelHandler(CHANNEL_ID, level=logging.DEBUG)
     handler.emit(_record())
     assert len(handler._prestart) == 1
-    assert isinstance(handler._prestart[0], hikari.Embed)
+    embed, ping = handler._prestart[0]
+    assert isinstance(embed, hikari.Embed)
+    assert ping is False  # only a record flagged ping=True mentions the owner
 
 
 def test_enqueue_drops_on_full_queue_without_blocking() -> None:
     handler = DiscordChannelHandler(CHANNEL_ID, level=logging.DEBUG)
     handler._queue = asyncio.Queue(maxsize=1)
-    handler._enqueue(hikari.Embed())
-    handler._enqueue(hikari.Embed())  # queue is full -> dropped, no block
+    handler._enqueue(hikari.Embed(), False)
+    handler._enqueue(hikari.Embed(), False)  # queue is full -> dropped, no block
     assert handler._dropped == 1
 
 

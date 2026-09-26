@@ -11,8 +11,9 @@ from coda.arcaea.errors import UnexpectedResponse
 
 logger = logging.getLogger(__name__)
 
-# rating is PTT x100 (1200 = 12.00), except -1, which means the player hides
-# their PTT in-game.
+# rating is PTT x1000 (12820 = 12.820), except -1, which means the player hides
+# their PTT in-game. Was x100 until lowiro's 2026-08-27 maintenance added a
+# third decimal -- see wiki/domains/potential.md.
 _RATING_HIDDEN = -1
 
 
@@ -76,10 +77,10 @@ def parse_friends(body: dict[str, Any]) -> list[Friend]:
 
 
 def _parse_rating(value: object) -> float | None:
-    """PTT x100 -> float, mapping the hidden sentinel to None."""
+    """PTT x1000 -> float, mapping the hidden sentinel to None."""
     if not isinstance(value, int) or value == _RATING_HIDDEN:
         return None
     if value < 0:
         logger.warning("unexpected negative rating %r, treating as hidden", value)
         return None
-    return value / 100
+    return value / 1000

@@ -6,7 +6,7 @@ purpose: Wordle-over-the-catalog minigame — puzzle generation, guess resolutio
 depends_on: [catalog, db, settings, extensions]
 used_by: []
 created: 2026-07-27
-updated: 2026-07-28
+updated: 2026-08-31
 tags: [module, chardle]
 aliases: ["chardle (module)"]
 ---
@@ -232,6 +232,28 @@ missed sweep leaves yesterday's board answering today's command.
 A shared channel board needs a **per-session FIFO lock** — the same shape as the
 live-updates poster's per-destination lock in `scores/poster.py`. Two people guessing
 simultaneously into a bounded pool must serialise, or the budget double-counts.
+
+## Board plates are chosen by chart, not by side
+
+`imaging/assets.py` backs each row with a 1600px plate 9-sliced to the board's width. The
+file is **not** simply `{side}.png`, and three of the rules are invisible from the
+filename alone (2026-08-31):
+
+- **Inscribed Beyonds take `ins.png` whatever side they sit on.** The alt appearance is a
+  chart property (`SongDifficulty.alt`, [[catalog|Catalog]] §Alt appearance), so it
+  outranks the side — it covers Achromic and Dark Lephon charts today. `ChartFacts.alt`
+  exists to carry it into the renderer.
+- **`ember.png` is a whole-row plate.** Ember's art contains its own jacket and title, so
+  that row draws neither and leaves the space to the plate. `assets.BAKED_IN` is the list.
+  The title cell is skipped entirely, feedback wash included — a wash there would tint the
+  art's own lettering. Every other column on the row scores normally.
+- **Only sides that actually have Beyond charts ship a `{side}_BYD.png`.** Sides 2–4 had
+  copies of their plain plate purely so a lookup could not miss; the copies are deleted and
+  `_side_plate` falls back instead. Dark Lephon (side 4) has no plain Beyond at all — both
+  of its Beyonds are Inscribed.
+
+Side 4 art is real as of 2026-08-31 (plate and `back/4.png`); it was a copy of Conflict's
+before that. `shadow_4.png`, the side pill, is still Conflict's.
 
 ## Related
 

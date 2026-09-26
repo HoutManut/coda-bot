@@ -48,7 +48,7 @@
   <ul class="links">
     {% for ch in charts %}
     <li><a href="/songs/{{ ch.song_id }}#chart-{{ ch.id }}">{{ ch.name }}</a>
-      {{ diff_chip(ch.difficulty) }}
+      {{ diff_chip(ch.difficulty, alt=ch.alt) }}
       <code>{{ ch.song_id }}</code></li>
     {% else %}<li class="muted">No charts.</li>{% endfor %}
   </ul>

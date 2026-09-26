@@ -6,13 +6,14 @@ import shlex
 
 from coda.ops.config import OP as CONFIG_OP
 from coda.ops.reconcile import OP as RECONCILE_OP
+from coda.ops.spoiler import OP as SPOILER_OP
 from coda.ops.types import Op, OpRequest, OpResult
 
 # Discord's hard cap on autocomplete results, and on one choice's value.
 MAX_SUGGESTIONS = 25
 MAX_SUGGESTION_LENGTH = 100
 
-OPS: dict[str, Op] = {op.name: op for op in (CONFIG_OP, RECONCILE_OP)}
+OPS: dict[str, Op] = {op.name: op for op in (CONFIG_OP, RECONCILE_OP, SPOILER_OP)}
 
 
 def tokenize(line: str) -> list[str]:

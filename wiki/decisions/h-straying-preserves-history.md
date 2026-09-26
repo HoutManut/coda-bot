@@ -47,7 +47,7 @@ no reconstruction step.
 
 ## Consequences
 
-- b30 ([[b30]], unbuilt) survives `/unregister` → `/register` for free — no
+- Potential ([[potential|Potential]]) survives `/unregister` → `/register` for free — no
   special-casing needed in its query, since it just reads whatever
   `play_scores` rows exist for the account.
 - A future "delete an account entirely" feature cannot be a plain `DELETE` —

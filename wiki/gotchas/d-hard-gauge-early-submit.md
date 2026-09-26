@@ -62,3 +62,15 @@ full song duration. Two consequences:
 A recent-30/r10 computation missing a normal-gauge track lost that the player insists they
 played; or a poller silently losing a clear that was immediately followed by a hard-gauge death
 (visible only as a gap shorter than the poll interval).
+
+## 2026-08-28 update
+
+The poll-cadence half of this page (the hard-gauge early-submit timing itself) is unaffected by
+Arcaea 7.0 and stays fully live. The r10-pool half (§Cause item 2, and the "`clear_type==0`
+alone is wrong" warning as applied to *pool admission*) is now historical — r10 and the
+recent-30 pool are DEV-STATED removed, see [[d-r10-impossible-friend-path]]. But the underlying
+warning — never collapse "not track_lost" logic onto `clear_type == 0` alone without also
+checking what it's being used for — is exactly the open question for 7.0's clear bonus: does
+"obtaining a Clear" mean `clear_type != 0`, and does a hard-gauge clear (`modifier == 2`,
+`clear_type` non-zero) count the same as a normal clear? Unconfirmed, tracked at
+[[h-7.0-potential-rework]] §4.

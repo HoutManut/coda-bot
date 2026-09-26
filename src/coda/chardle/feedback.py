@@ -11,9 +11,16 @@ from dataclasses import dataclass
 
 from coda.chardle.columns import Clue
 from coda.chardle.facts import ChartFacts
+from coda.db.enums import Side
 
 # Yellow window, in stored units: level is x2 (±4 = ±2 game levels).
 LEVEL_WINDOW = 4
+
+# The game presents all three as one side, so naming the wrong one of them is a
+# near miss rather than a wrong answer. Light and Conflict stand alone.
+SIDE_FAMILY = frozenset(
+    {Side.ACHROMIC.to_id(), Side.LEPHON.to_id(), Side.DARK_LEPHON.to_id()}
+)
 
 
 class Color(enum.Enum):
@@ -60,7 +67,7 @@ def evaluate(
         case Clue.PACK:
             return _pack(guess, answer)
         case Clue.SIDE:
-            return _equality(guess.side == answer.side)
+            return _side(guess.side, answer.side)
         case Clue.VERSION:
             return _version(guess.version, answer.version)
         case Clue.LEVEL:
@@ -75,6 +82,14 @@ def evaluate(
 
 def _equality(match: bool) -> Cell:
     return Cell(Color.GREEN if match else Color.RED)
+
+
+def _side(guess: int, answer: int) -> Cell:
+    if guess == answer:
+        return Cell(Color.GREEN)
+    if guess in SIDE_FAMILY and answer in SIDE_FAMILY:
+        return Cell(Color.YELLOW)
+    return Cell(Color.RED)
 
 
 def _sets(guess: frozenset[str], answer: frozenset[str]) -> Cell:

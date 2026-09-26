@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from coda.settings.types import ConfigKey, Scope
+from coda.tournaments import options as tournament_options
 from coda.utils.zones import DEFAULT_ZONE
 
 REGISTRY: dict[str, ConfigKey] = {
@@ -66,13 +67,61 @@ REGISTRY: dict[str, ConfigKey] = {
         description="How long an untouched free-play board holds its channel's slot",
         audience="owner",
     ),
-    "recent_b30_stat": ConfigKey(
-        name="recent_b30_stat",
+    "recent_b50_stat": ConfigKey(
+        name="recent_b50_stat",
         default="never",
-        type=("never", "b30", "b40", "b100", "always"),
+        type=("never", "b50", "b60", "b100", "always"),
         guild_chain=(Scope.USER, Scope.GLOBAL),
         dm_chain=(Scope.USER, Scope.GLOBAL),
-        description="How deep in your ranking /recent shows b30 impact",
+        description="How deep in your ranking /recent shows potential impact",
+    ),
+    # Defaults to showing, unlike recent_b50_stat: this one prints a position
+    # and never a rating, so it reveals nothing a hidden PTT was hiding.
+    "score_rank_depth": ConfigKey(
+        name="score_rank_depth",
+        default="b50",
+        type=("never", "b50", "b60", "b100", "always"),
+        guild_chain=(Scope.USER, Scope.GLOBAL),
+        dm_chain=(Scope.USER, Scope.GLOBAL),
+        description="How deep in your ranking /score shows a chart's position",
+    ),
+    # The four tournament defaults exist for one reason: to keep
+    # `/tournament quick with:@bob class:ftr` short. Every other choice is an
+    # option on a surface where the user is already choosing things.
+    # None is USER-writable: a match is shared state, and a per-user default
+    # would mean two players in one match believe different rules apply while
+    # the board can only draw one of them.
+    "tournament_default_level": ConfigKey(
+        name="tournament_default_level",
+        default="",
+        type="str",
+        guild_chain=(Scope.GUILD, Scope.GLOBAL),
+        dm_chain=(Scope.GLOBAL,),
+        description="Level band quick matches draw from, e.g. 9-10+. Empty means any",
+    ),
+    "tournament_default_bans": ConfigKey(
+        name="tournament_default_bans",
+        default=True,
+        type="bool",
+        guild_chain=(Scope.GUILD, Scope.GLOBAL),
+        dm_chain=(Scope.GLOBAL,),
+        description="Whether a quick match opens with pick/ban",
+    ),
+    "tournament_default_best_of": ConfigKey(
+        name="tournament_default_best_of",
+        default="3",
+        type=tournament_options.values(tournament_options.BEST_OF),
+        guild_chain=(Scope.GUILD, Scope.GLOBAL),
+        dm_chain=(Scope.GLOBAL,),
+        description="How many rounds a quick match plays",
+    ),
+    "tournament_default_visibility": ConfigKey(
+        name="tournament_default_visibility",
+        default="public",
+        type=tournament_options.values(tournament_options.VISIBILITY),
+        guild_chain=(Scope.GUILD, Scope.GLOBAL),
+        dm_chain=(Scope.GLOBAL,),
+        description="Whether a quick match thread is readable by the whole server",
     ),
 }
 

@@ -8,16 +8,16 @@ live-update feed can post them.
 
 from __future__ import annotations
 
-from coda.scores.b30 import B30Service
 from coda.scores.coordinator import PollCoordinator
 from coda.scores.observations import ObservationCache
+from coda.scores.potential import PotentialService
 from coda.scores.service import ScoreStore
 from coda.scores.tracking import TrackingService
 
 __all__ = [
-    "B30Service",
     "ObservationCache",
     "PollCoordinator",
+    "PotentialService",
     "ScoreStore",
     "TrackingService",
 ]

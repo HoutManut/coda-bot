@@ -1,14 +1,14 @@
 ---
 type: source
-status: active
+status: superseded
 path: arcaea-potential.md
 lines: 433
 dated: 2026-07-21
 verified: 2026-07-21
 supersedes: []
-superseded_by: []
+superseded_by: [arcaea-7.0-potential-notes.md]
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-08-28
 tags: [source, arcaea, potential, ptt]
 aliases: ["Arcaea — Potential (PTT)"]
 ---
@@ -59,12 +59,22 @@ Companion to `arcaea-scoring.md` (score) and `arcaea-domain-reference.md` (CC).
 
 ## Contradicts / reversed by
 
+**Superseded 2026-08-28 by [[arcaea-7.0-potential-notes]]** on the formula itself: r10, the
+`/40` divisor, and the recent-30 admission table are pre-7.0 and no longer live (DEV-STATED,
+official tweet) — replaced by best-50 with the top 10 doubled and a clear-status bonus. The
+play-rating base formula (score+CC) and the PTT wire-encoding facts below are **not** touched by
+that source and remain independently valid, modulo the separate ×100→×1000 scale change captured
+2026-08-27 (before the 7.0 tweet, unrelated supersession — see [[potential|Potential]] §PTT wire
+encoding). See [[potential|Potential]] §Historical for what this source fed that is now archived
+rather than live.
+
 None against `arcaea-scoring.md` (cross-references and is internally consistent with it on the
 hard-gauge discriminator) or `arcaea-domain-reference.md` (CC scale). Note the **field-name
-collision**: this doc's `rating` (PTT, ×100, `-1`=hidden on friend/player objects) is a
-different field from `arcaea-domain-reference.md`'s `rating` (CC, ×10, `<=0`=unknown on
-`song_difficulties`). Not a contradiction between the sources — both are internally correct —
-but the shared name is a real cross-source trap. See [[d-ptt-hidden-sentinel]].
+collision**: this doc's `rating` (PTT, ×100 at the time this doc was written — ×1000 as of
+2026-08-27, `-1`=hidden on friend/player objects) is a different field from
+`arcaea-domain-reference.md`'s `rating` (CC, ×10, `<=0`=unknown on `song_difficulties`). Not a
+contradiction between the sources — both are internally correct — but the shared name is a real
+cross-source trap. See [[d-ptt-hidden-sentinel]].
 
 ## Feeds
 

@@ -21,10 +21,7 @@ def encode(image: Image.Image, *, final: bool) -> bytes:
     if not final:
         image = _downscale(image, LIVE_WIDTH)
     buffer = BytesIO()
-    # Flattened onto the plate's own dark backing: Discord renders a transparent
-    # PNG against the user's theme, which makes the 72-grey values vanish in
-    # dark mode.
-    _flatten(image).save(
+    image.save(
         buffer,
         format="WEBP",
         quality=FINAL_QUALITY if final else LIVE_QUALITY,

@@ -8,7 +8,7 @@ verified: 2026-07-21
 supersedes: ["arcaea-api-layer.md (bot-code refusal design, account-switching model) — historical target; already reconciled in the live doc, see below"]
 superseded_by: []
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 tags: [source, handoffs, meta]
 aliases: ["Handoffs — README"]
 ---
@@ -57,6 +57,21 @@ two unresearched notes (06, 11).
 - b30 (09) depends on nothing unbuilt; 10 (backfill research) is an
   independent input upgrade, not a blocker for 09.
 
+## Later additions (not in the 2026-07-21 ingest)
+
+The status summary above is frozen at 2026-07-21. Handoffs added since:
+
+| # | Covers | Status |
+|---|---|---|
+| 12 | `/recent` b30 stat config | landed |
+| 13 | **Quick match** — the tournament module's match layer and everything under it: rounds, windows, validity, ranking, pool, pick/ban, threads, the match board, configuration | unbuilt |
+| 14 | **Tournament formats** — registration, single/double elimination, round robin, no-elimination lobby, seeding, async scheduling, no-shows, the bracket board | unbuilt |
+
+**13 and 14 are one spec split at the match**, which is the invariant unit —
+every format decomposes into matches, so nothing in 14 changes anything in 13.
+**Build 13 first**: a quick match exercises every table, query and surface 14
+relies on. See [[tournaments|Tournaments]] for the policy layer over both.
+
 ## Contradicts / reversed by
 
 None currently active — see the reconciled bot-code point above. The
@@ -67,4 +82,5 @@ stale (the original design was never written to a source doc).
 
 [[db]] (player_links unique-discord-id constraint),
 [[h-one-account-per-user]], [[live-updates|Live Updates]], [[tournaments|Tournaments]]
-(indirectly, via the landed score-tracking foundation it describes)
+(indirectly, via the landed score-tracking foundation it describes) ·
+[[handoff-13-tournaments|13 — quick match]] · [[handoff-14-tournament-formats|14 — tournament formats]]

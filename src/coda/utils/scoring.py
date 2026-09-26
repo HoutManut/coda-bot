@@ -2,12 +2,19 @@
 
 Play rating is computed at read time, never stored: a chart's CC refines over
 time, so a stored rating silently goes stale (``play_score.py``).
+
+Since 7.0 a play rating is no longer a pure function of score and CC -- a clear
+adds a flat bonus, and clear status is own-credentials only. :func:`resolve_clear`
+is the single place that decides it, so a caller never has to guess.
 """
 
 from __future__ import annotations
 
-from enum import IntEnum
+from dataclasses import dataclass
+from enum import Enum, IntEnum
 from math import isqrt
+
+from coda.arcaea.dto.enums import ClearType
 
 # The in-game grades
 PURE_MEMORY = 10_000_000
@@ -94,11 +101,68 @@ def format_score(score: int) -> str:
     return _DIVIDER.join(groups)
 
 
-def calculate_play_rating(score: int, chart_cc: float) -> float:
+# Flat, not scaled by score or CC
+CLEAR_BONUS = 0.2
+
+# The friend wire carries no clear_type at all, so a tier-1 row's clear status is
+# inferred from the one field it does have. Deliberately below the ~9.3-9.4M band
+# where genuine fails stop appearing in practice -- see
+# wiki/gotchas/d-clear-bonus-impossible-friend-path.md for why a bare "assume
+# cleared" and a bare "assume failed" were both rejected.
+ASSUMED_CLEAR_SCORE = 9_000_000
+
+
+class ClearBasis(Enum):
+    """How a play's clear status was arrived at. Never blend these silently --
+    a surface showing a rating must be able to say which one it used."""
+
+    WIRE = "wire"
+    OVERRIDE = "override"
+    ASSUMED = "assumed"
+
+
+# Prefixed to a rating that rests on ASSUMED, and to any figure summing one.
+# Only that basis is marked: WIRE and OVERRIDE are both statements of fact, one
+# by lowiro and one by the account's owner, and a mark that fires on every state
+# discriminates nothing. Unmarked therefore means "known", and the marked rows
+# are exactly the review queue (d-clear-bonus-impossible-friend-path).
+ASSUMED_MARK = "~"
+
+
+@dataclass(frozen=True)
+class ClearStatus:
+    cleared: bool
+    basis: ClearBasis
+
+
+def resolve_clear(
+    clear_type: ClearType | None, clear_override: bool | None, score: int
+) -> ClearStatus:
+    """Whether a play counts as cleared for the rating bonus, and on what basis.
+
+    Wire beats override beats heuristic: ``clear_type`` is fact, so an override
+    on a row that has one is stale data, not a correction.
+    """
+    if clear_type is not None:
+        # The one place the clear_type boundary is encoded. TRACK_LOST -> no
+        # bonus is an owner WORKING ASSUMPTION, not a capture: a best-50 pool
+        # structurally cannot contain one, so the 2026-08-31 residual analysis
+        # had no data point for it. See h-7.0-potential-rework.md §4 before
+        # treating this line as settled.
+        return ClearStatus(clear_type is not ClearType.TRACK_LOST, ClearBasis.WIRE)
+    if clear_override is not None:
+        return ClearStatus(clear_override, ClearBasis.OVERRIDE)
+    return ClearStatus(score >= ASSUMED_CLEAR_SCORE, ClearBasis.ASSUMED)
+
+
+def calculate_play_rating(score: int, chart_cc: float, *, cleared: bool) -> float:
     """The play rating for a score on a chart of constant ``chart_cc``.
 
     Caller must pass a KNOWN cc (``> 0``); an unknown one has no rating to show
-    and must be omitted rather than rendered from a sentinel.
+    and must be omitted rather than rendered from a sentinel. ``cleared`` is
+    required rather than defaulted: since 7.0 two identical scores can earn
+    different ratings, so a caller that has not decided must not be able to
+    silently inherit an answer.
     """
     if score >= PURE_MEMORY:
         modifier = 2.0
@@ -106,6 +170,8 @@ def calculate_play_rating(score: int, chart_cc: float) -> float:
         modifier = 1 + (score - EX) / 200_000
     else:
         modifier = (score - AA) / 300_000
+    if cleared:
+        modifier += CLEAR_BONUS
     return max(0.0, round(chart_cc + modifier, 5))
 
 

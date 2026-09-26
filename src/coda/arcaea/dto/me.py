@@ -58,7 +58,9 @@ def parse_me(body: dict[str, Any]) -> Me:
         # exposed at all, which is why registration must diff (see endpoints).
         friend_code=str(value.get("user_code", "")),
         max_friends=value["max_friend"] if isinstance(value.get("max_friend"), int) else 10,
-        rating=rating / 100 if isinstance(rating, int) and rating >= 0 else None,
+        # PTT x1000 (was x100 until lowiro's 2026-08-27 maintenance added a
+        # third decimal); -1 means hidden, handled by the >= 0 guard below.
+        rating=rating / 1000 if isinstance(rating, int) and rating >= 0 else None,
         arcaea_online_expire_ts=(
             value["arcaea_online_expire_ts"]
             if isinstance(value.get("arcaea_online_expire_ts"), int)

@@ -155,6 +155,30 @@
     refresh();
   }
 
+  // --- split date/offset pair: a native <input type=date> has no text
+  // caret, so it silently refuses paste in every browser (no `paste` event
+  // even fires) -- there's nowhere to paste epoch seconds into. The `epoch`
+  // sibling is a plain text input instead, so paste always works there; it
+  // fills date_day/date_offset and clears itself, mirroring
+  // utils/dates.split_date server-side. ------------------------------------
+  function wireDatePair(el) {
+    const day = $("[data-date-day]", el);
+    const offset = $("[data-date-offset]", el);
+    const epoch = $("[data-date-epoch]", el);
+    if (!day || !offset || !epoch) return;
+    epoch.addEventListener("input", () => {
+      const txt = epoch.value.trim();
+      if (!/^-?\d+$/.test(txt)) return;
+      const sec = parseInt(txt, 10);
+      const d = new Date(sec * 1000);
+      const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
+      day.value = d.toISOString().slice(0, 10);
+      offset.value = String(sec - midnight);
+      day.dispatchEvent(new Event("change", { bubbles: true }));
+      epoch.value = "";
+    });
+  }
+
   // --- artist/charter link picker: parse "(id)" tail, auto-link -----------
   // Mirrors catalog/entity_id.clean_entity_id: strip only URL-breaking chars,
   // collapse whitespace. Case, spaces, punctuation and non-ASCII all survive.
@@ -727,6 +751,7 @@
     $$("[data-linkform]", scope).forEach(wireLinkPicker);
     $$("[data-tagform]", scope).forEach(wireTagPicker);
     $$("[data-secdate]", scope).forEach(wireSecDate);
+    $$("[data-datepair]", scope).forEach(wireDatePair);
     $$("[data-dirty-track]", scope).forEach(wireDirtyTracker);
     $$("[data-unfilter]", scope).forEach(wireUnfilter);
   }

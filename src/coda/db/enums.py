@@ -99,17 +99,74 @@ class ChardleState(enum.Enum):
     LOST = "lost"
 
 
+class ThreadVisibility(enum.Enum):
+    """Who may read a tournament match's thread -- the whole privacy model.
+
+    ``public`` is readable by the guild; ``private`` has the bot add each
+    participant. Nothing else gates reading a match. Stored as the lowercase
+    string value.
+    """
+
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+
+class MatchState(enum.Enum):
+    """Lifecycle of a :class:`~coda.db.models.tournament.TournamentMatch`.
+
+    ``scheduled`` is reachable only by an async tournament format and is never
+    entered by a quick match, which is created in ``draft``. Stored as the
+    lowercase string value.
+    """
+
+    SCHEDULED = "scheduled"
+    DRAFT = "draft"
+    PICKBAN = "pickban"
+    PLAYING = "playing"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
+
+
+class PoolEntryState(enum.Enum):
+    """Where one chart pool entry stands in the pick/ban sequence.
+
+    The decider is not a member: at the end of the sequence exactly one entry is
+    still ``available``, and that is what makes it the decider. Stored as the
+    lowercase string value.
+    """
+
+    AVAILABLE = "available"
+    BANNED = "banned"
+    PICKED = "picked"
+
+
+class RoundState(enum.Enum):
+    """Lifecycle of a :class:`~coda.db.models.tournament.TournamentRound`.
+
+    ``grace`` stops accepting new ``time_played`` but keeps polling, because
+    polling is discrete and a play at ``end_ms - 1s`` may not be seen until
+    after ``end_ms``. Stored as the lowercase string value.
+    """
+
+    PENDING = "pending"
+    OPEN = "open"
+    GRACE = "grace"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
+
+
 class Side(enum.Enum):
     """A song's visual theme. Stored as the lowercase string value."""
 
     LIGHT = "light"
     CONFLICT = "conflict"
-    COLORLESS = "colorless"
+    ACHROMIC = "achromic"
     LEPHON = "lephon"
+    DARK_LEPHON = "dark_lephon"
 
     @classmethod
     def from_id(cls, value: int) -> Side:
-        """Map the game's numeric side id (0-3) to a member."""
+        """Map the game's numeric side id (0-4) to a member."""
         return _SIDE_BY_ID[value]
 
     def to_id(self) -> int:
@@ -120,8 +177,9 @@ class Side(enum.Enum):
 _SIDE_BY_ID: dict[int, Side] = {
     0: Side.LIGHT,
     1: Side.CONFLICT,
-    2: Side.COLORLESS,
+    2: Side.ACHROMIC,
     3: Side.LEPHON,
+    4: Side.DARK_LEPHON,
 }
 
 _SIDE_IDS: dict[Side, int] = {side: value for value, side in _SIDE_BY_ID.items()}
@@ -166,6 +224,30 @@ clear_type_type: SAEnum = SAEnum(
 gauge_modifier_type: SAEnum = SAEnum(
     GaugeModifier,
     name="gauge_modifier",
+    values_callable=lambda e: [m.value for m in e],
+)
+
+thread_visibility_type: SAEnum = SAEnum(
+    ThreadVisibility,
+    name="thread_visibility",
+    values_callable=lambda e: [m.value for m in e],
+)
+
+match_state_type: SAEnum = SAEnum(
+    MatchState,
+    name="match_state",
+    values_callable=lambda e: [m.value for m in e],
+)
+
+pool_entry_state_type: SAEnum = SAEnum(
+    PoolEntryState,
+    name="pool_entry_state",
+    values_callable=lambda e: [m.value for m in e],
+)
+
+round_state_type: SAEnum = SAEnum(
+    RoundState,
+    name="round_state",
     values_callable=lambda e: [m.value for m in e],
 )
 

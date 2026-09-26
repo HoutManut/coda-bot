@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -21,6 +22,20 @@ def _snowflakes(name: str) -> tuple[int, ...]:
     """Parse a comma- or space-separated ID list, preserving order."""
     raw = os.environ.get(name, "")
     return tuple(int(part) for part in raw.replace(",", " ").split())
+
+
+_YOUTUBE_HOSTS = frozenset({"www.youtube.com", "youtube.com", "youtu.be"})
+
+
+def _youtube_urls(name: str) -> tuple[str, ...]:
+    """Comma-separated URL list, rejecting anything not hosted on YouTube."""
+    raw = os.environ.get(name, "")
+    urls = tuple(part.strip() for part in raw.split(",") if part.strip())
+    for url in urls:
+        host = urlsplit(url).hostname
+        if host not in _YOUTUBE_HOSTS:
+            raise RuntimeError(f"{name} entry is not a youtube.com/youtu.be URL: {url!r}")
+    return urls
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +66,11 @@ class Config:
     # accounts exist. The poller jitters heavily around it, so it is an average,
     # not a schedule.
     poll_interval: float
+    # A max score gets a link, chosen at random from this list -- the easter
+    # egg's whole point is not knowing which one lands. youtube.com/youtu.be
+    # only, enforced at parse time so nothing downstream has to check. Empty
+    # tuple disables the link (score still renders, just plain).
+    max_score_urls: tuple[str, ...]
     # Logging. All optional with defaults so importing config (alembic, admin)
     # never needs them. Per-handler thresholds are static for the process.
     log_level: str
@@ -74,6 +94,7 @@ class Config:
             fernet_key=_require("FERNET_KEY"),
             owner_friend_code=os.environ.get("OWNER_FRIEND_CODE") or None,
             poll_interval=float(os.environ.get("POLL_INTERVAL") or 90.0),
+            max_score_urls=_youtube_urls("MAX_SCORE_URLS"),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
             log_dir=os.environ.get("LOG_DIR") or None,
             log_file_level=os.environ.get("LOG_FILE_LEVEL", "DEBUG"),

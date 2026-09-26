@@ -30,6 +30,9 @@ router = APIRouter()
 
 _EXCLUSIVE = {DifficultyClass.BYD: DifficultyClass.ETR, DifficultyClass.ETR: DifficultyClass.BYD}
 
+# Classes lowiro's alt appearance ("Inscribed") applies to -- see catalog/labels.py.
+_ALT_ELIGIBLE = {DifficultyClass.BYD, DifficultyClass.BYD_2}
+
 
 def _back(song_id: str, error: str = "", anchor: str = "") -> RedirectResponse:
     url = f"/songs/{song_id}"
@@ -54,6 +57,7 @@ def _chart_values(form, difficulty: DifficultyClass) -> dict:
         "note": int(form.get("note") or 0),
         "chart_designer": (form.get("chart_designer") or "").strip() or None,
         "game_song_id": (form.get("game_song_id") or "").strip() or None,
+        "alt": difficulty in _ALT_ELIGIBLE and form.get("alt") is not None,
         **overrides,
     }
 

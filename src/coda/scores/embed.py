@@ -11,23 +11,20 @@ than inventing a value.
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import hikari
 
-from coda.catalog.colors import CLASS_COLORS
+from coda.catalog.colors import class_color
 from coda.catalog.jackets import chart_jacket, display_name
 from coda.catalog.labels import chart_rating_line
 from coda.catalog.resolution import effective
+from coda.config import config
 from coda.db.enums import DifficultyClass
 from coda.db.models import PlayScore, Song, SongDifficulty
-from coda.utils.scoring import PURE_MEMORY, format_score
-
-# A max score is worth celebrating, so it gets the one thing embed text can't
-# otherwise do -- colour. A link renders blue; where it goes is between you and
-# the person who clicked it.
-_MAX_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+from coda.utils.scoring import PURE_MEMORY, format_score, resolve_clear
 
 _COLOR_UNKNOWN = 0x5865F2
 
@@ -113,10 +110,12 @@ def _title(
 
 def _color(row: PlayScore, chart: SongDifficulty | None) -> int:
     """The played difficulty's colour, from the chart or the raw wire int."""
-    difficulty = chart.difficulty if chart else _wire_class(row)
+    if chart is not None:
+        return class_color(chart.difficulty, chart.alt)
+    difficulty = _wire_class(row)
     if difficulty is None:
         return _COLOR_UNKNOWN
-    return CLASS_COLORS[difficulty]
+    return class_color(difficulty)
 
 
 def _wire_class(row: PlayScore) -> DifficultyClass | None:
@@ -124,9 +123,10 @@ def _wire_class(row: PlayScore) -> DifficultyClass | None:
 
 
 def _body(row: PlayScore, chart: SongDifficulty | None) -> str:
-    lines = [_score_line(row.score, chart.note if chart else None)]
+    lines = [_score_line(row.id, row.score, chart.note if chart else None)]
     if chart is not None:
-        lines.append(chart_rating_line(row.score, chart))
+        clear = resolve_clear(row.clear_type, row.clear_override, row.score)
+        lines.append(chart_rating_line(row.score, chart, clear))
     if row.pure_count is not None:
         lines.append(_detail_line(row))
     if chart is None:
@@ -134,7 +134,7 @@ def _body(row: PlayScore, chart: SongDifficulty | None) -> str:
     return "\n".join(lines)
 
 
-def _score_line(score: int, note: int | None) -> str:
+def _score_line(play_id: int, score: int, note: int | None) -> str:
     """The score, plus how far from max it is when that is knowable.
 
     Below a PM this is just the grouped digits. At or above one, the distance
@@ -150,10 +150,17 @@ def _score_line(score: int, note: int | None) -> str:
 
     short = PURE_MEMORY + note - score
     if short == 0:
-        return f"[{text} (MPM)]({_MAX_URL})"
+        if not config.max_score_urls:
+            return f"{text} (MPM)"
+        return f"[{text} (MPM)]({_max_url(play_id)})"
     if short < 0:
         return text
     return f"{text} (MPM-{short})"
+
+
+def _max_url(play_id: int) -> str:
+    """Which link a max score gets"""
+    return random.Random(play_id).choice(config.max_score_urls)
 
 
 def _detail_line(row: PlayScore) -> str:

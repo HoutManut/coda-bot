@@ -125,13 +125,13 @@
   {% if kind == 'charters' %}
   <ul class="links" data-sortable data-merge>
     {% for s in responsible_songs %}<li data-idx="{{ s.idx }}" data-name="{{ s.name|lower }}" data-date="{{ s.date }}" data-song="{{ s.song_id }}" data-total="{{ s.total }}"><a href="/songs/{{ s.song_id }}">{{ s.name }}</a> <code>{{ s.song_id }}</code>
-      {% for d in s.diffs %}{{ diff_chip(d, d.ordinal if d.ordinal is not none else 99) }}{% endfor %}</li>
+      {% for d, alt in s.diffs %}{{ diff_chip(d, d.ordinal if d.ordinal is not none else 99, alt) }}{% endfor %}</li>
     {% else %}<li class="muted">No charts.</li>{% endfor %}
   </ul>
   {% else %}
   <ul class="links" data-sortable>
     {% for e in entries %}<li data-idx="{{ e.idx }}" data-name="{{ e.name|lower }}" data-date="{{ e.date }}"><a href="/songs/{{ e.song_id }}{% if e.difficulty_id %}#chart-{{ e.difficulty_id }}{% endif %}">{{ e.name }}</a>
-      {% if e.difficulty %}{{ diff_chip(e.difficulty) }}{% endif %}
+      {% if e.difficulty %}{{ diff_chip(e.difficulty, alt=e.alt) }}{% endif %}
       <code>{{ e.song_id }}</code>{% if e.note %} <span class="muted">({{ e.note }})</span>{% endif %}</li>
     {% else %}<li class="muted">No songs.</li>{% endfor %}
   </ul>

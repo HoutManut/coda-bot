@@ -12,6 +12,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -49,7 +50,7 @@ class PlayScore(Base):
         ),
         # /recent, history, and the live-update feed: latest-first per account.
         Index("ix_play_scores_account_time", "arcaea_account_id", "time_played"),
-        # Personal best per chart and b30 scans.
+        # Personal best per chart and best-pool scans.
         Index(
             "ix_play_scores_account_chart_score",
             "arcaea_account_id",
@@ -106,6 +107,13 @@ class PlayScore(Base):
     # lowiro's stable per-play id. Own tier only; NULL on friend. Enrichment and
     # trace column, NOT the dedup key (friend rows have none) -- see uq above.
     wire_play_id: Mapped[str | None] = mapped_column(String)
+
+    # The account owner's correction to the assumed-clear heuristic that stands in
+    # for a missing clear_type. Per ROW, not per chart: a later play on the same
+    # chart carries no override of its own and falls back to the heuristic. Only
+    # meaningful while clear_type is NULL -- a wire-known clear type is fact and
+    # wins (resolve_clear, utils/scoring.py).
+    clear_override: Mapped[bool | None] = mapped_column(Boolean)
 
     # 'friend' | 'own' -- which path observed THIS row. Tells whether the detail
     # columns are trustworthy and drives cross-tier enrichment (a 'friend'

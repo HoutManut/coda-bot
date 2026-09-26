@@ -23,9 +23,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coda.catalog.jackets import is_night
+from coda.catalog.spoilers import chart_spoilered
 from coda.db.models import (
     ArcaeaAccount,
-    PlayerCredential,
     PlayerLink,
     PlayScore,
     Song,
@@ -34,13 +34,13 @@ from coda.db.models import (
 from coda.arcaea.dto.score import ScoreResult
 from coda.db.session import async_session
 from coda.players.live import LiveUpdateService
-from coda.scores import B30Service, ObservationCache, PollCoordinator
-from coda.scores.b30_stat import b30_stat_line
+from coda.scores import PotentialService, ObservationCache, PollCoordinator
+from coda.scores.potential_stat import StatMode, potential_stat_line
 from coda.scores.embed import PlayerIdentity, score_embed
-from coda.scores.keys import OWN, PollKey
+from coda.scores.routing import poll_key_for
 from coda.scores.service import row_values
 from coda.scores.suppression import PostSuppressor
-from coda.sessions.pool import SessionPool
+from coda.utils.container import as_container
 from coda.settings import ConfigService
 from coda.settings.zone import effective_zone
 
@@ -73,7 +73,7 @@ class Recent(
         coordinator: PollCoordinator,
         observations: ObservationCache,
         settings: ConfigService,
-        b30: B30Service,
+        potential: PotentialService,
         suppressor: PostSuppressor,
     ) -> None:
         # Both checks run before the defer, and both are single indexed reads.
@@ -84,7 +84,7 @@ class Recent(
             if account is None:
                 await ctx.respond(_NOT_REGISTERED, ephemeral=True)
                 return
-            key = await _poll_key(db, account)
+            key = await poll_key_for(db, account)
             account_id = account.id
             arc_user_id = account.arc_user_id
             tracking_enabled = account.tracking_enabled
@@ -130,9 +130,9 @@ class Recent(
             # Read live every call, never remembered: a player who hides their
             # PTT mid-session must stop seeing this line on the very next run.
             rating, rating_observed = observations.latest_rating(arc_user_id)
-            line = await b30_stat_line(
+            line = await potential_stat_line(
                 db,
-                b30,
+                potential,
                 row,
                 chart,
                 mode=await _stat_mode(db, settings, ctx),
@@ -143,7 +143,13 @@ class Recent(
             if line is not None:
                 embed.description = f"{embed.description}\n{line}"
             await _mark_shown(db, ctx, suppressor, row)
-        await ctx.respond(embed=embed)
+        # No ephemeral option to flip, and none could be added: the defer above
+        # fixes the flags before ``request_refresh`` has said which play this
+        # is. Making it ephemeral would also break post suppression -- the
+        # channel's live post is marked shown by a reply nobody there saw. So
+        # the blur is the whole protection here.
+        spoiler = chart is not None and song is not None and chart_spoilered(song, chart)
+        await ctx.respond(components=[as_container(embed, [], spoiler=spoiler)])
 
 
 async def _mark_shown(
@@ -180,11 +186,11 @@ async def _mark_shown(
 
 async def _stat_mode(
     db: AsyncSession, settings: ConfigService, ctx: lightbulb.Context
-) -> str:
-    """The caller's resolved ``recent_b30_stat`` preference."""
+) -> StatMode:
+    """The caller's resolved ``recent_b50_stat`` preference."""
     return await settings.resolve(
         db,
-        "recent_b30_stat",
+        "recent_b50_stat",
         guild_id=int(ctx.guild_id) if ctx.guild_id is not None else None,
         channel_id=int(ctx.channel_id),
         user_id=int(ctx.user.id),
@@ -200,25 +206,6 @@ async def _account_of(db: AsyncSession, discord_id: int) -> ArcaeaAccount | None
         .where(PlayerLink.discord_id == discord_id)
     )
     return row.scalar_one_or_none()
-
-
-async def _poll_key(db: AsyncSession, account: ArcaeaAccount) -> PollKey | None:
-    """Which path to refresh this account on -- own if it can, else friend.
-
-    None means neither is available (strayed, or the slot was released), which
-    is a plain error: there is nothing to refresh and nothing new to show.
-    """
-    if not account.is_active:
-        return None
-    credential = await db.scalar(
-        select(PlayerCredential.id).where(
-            PlayerCredential.arcaea_account_id == account.id,
-            PlayerCredential.is_valid.is_(True),
-        )
-    )
-    if credential is not None:
-        return (OWN, account.id)
-    return SessionPool(db).poll_key(account)
 
 
 async def _newest_play(

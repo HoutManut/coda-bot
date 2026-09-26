@@ -118,11 +118,12 @@ class AccountSession:
             sid, expires_at = await auth.login(
                 self._account.email, self._account.password
             )
-        except InvalidCredentials:
+        except InvalidCredentials as exc:
             logger.error(
-                "account %s: credentials rejected (403). Deactivating -- "
-                "this needs a human, retrying would be a login storm",
+                "account %s: %s. Deactivating -- this needs a human, "
+                "retrying would be a login storm",
                 self._account.id,
+                exc,
             )
             await self._account.mark_dead(self._db)
             raise

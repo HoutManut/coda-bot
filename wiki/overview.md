@@ -3,7 +3,7 @@ type: meta
 title: "Overview"
 status: stub
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 tags: [meta, overview]
 aliases: ["coda-bot — Overview"]
 ---
@@ -54,9 +54,16 @@ no `relationship()` anywhere. hikari + lightbulb v3 for Discord. A separate Fast
 
 Built: song catalog + admin editor, settings, lowiro API layer, session pool, `/register`,
 live-update config, score tracking (poll loop both paths, storage, chart resolution +
-reconcile), `/recent`.
+reconcile, `/recent`, `/score`, `/tracking`, live-update poster + post filters), `/song`,
+`/potential` + clear review (the 7.0 best-50 model, shipped 2026-08-31), chardle,
+`/run` owner terminal, spoiler mode.
 
-Not built: the live-update poster, tournaments, `/song`, b30.
+Not built: **tournaments** — design is complete and locked as of 2026-09-02; build from
+[[handoff-13-tournaments|handoff 13]]. Also unbuilt: **ownership** — no longer a sketch. The
+design was measured and answered on 2026-09-03 ([[ownership-worksheet-2026-09-03]]): song
+ownership is *derived* from `/webapi/user/me` for credentialed players, Beyond is declared,
+and the model is the owner's **OWNED ∧ UNLOCKED** split at chart grain. The blob survives
+only as one of two surfaces for friend-code players.
 
 ## Where to go next
 

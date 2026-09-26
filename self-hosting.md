@@ -91,7 +91,7 @@ Chardle draws its boards with Pillow, from PNGs under `assets/chardle/`:
 
 ```
 header.png stand.png            column header plate and its label ornament
-0.png 1.png 2.png 3.png         row plate per side; 3 (Lephon) copies 2 (Colorless)
+0.png 1.png 2.png 3.png         row plate per side; 3 (Lephon) copies 2 (Achromic)
 0_BYD.png … 3_BYD.png           Beyond variants; 2_BYD/3_BYD copy the plain plate
 back/0.png … back/3.png         jacket frame
 shadow_0.png … shadow_3.png     side pill drawn under the side name
@@ -130,6 +130,48 @@ uv run python -m coda.catalog.seed
 uv run python scripts/seed_bot_account.py --email <your-bot-account>
 uv run python -m coda                                # run the bot
 ```
+
+## Tournaments
+
+Matches run in **threads off one channel per server**, so an admin has to point the
+bot at one before anything can start:
+
+```
+/tournament channel channel:#tournaments
+```
+
+Or run `/tournament channel` with no options in the channel you want to use, and
+press **Use this channel**. The button only appears when no channel is set yet,
+and only for someone with Manage Channels.
+
+Without it `/tournament quick` refuses. It never falls back to the channel the
+command was typed in — a server that later moves its tournament channel would
+otherwise strand every thread already under the old one.
+
+The bot needs these permissions **in that channel**:
+
+| Permission | Without it |
+|---|---|
+| Create Public Threads | a `visibility: public` match cannot start |
+| Create Private Threads | a `visibility: private` match cannot start (this is the default) |
+| Send Messages in Threads | the thread opens but the board never posts |
+| Manage Threads | a crew's archived thread cannot be reused, so every match opens a new one |
+
+The failures are silent from a player's side — they just see a refusal naming the
+permission — so it is worth checking the channel overrides rather than the
+server-wide role.
+
+Two server defaults keep `/tournament quick` short, and both are optional:
+
+```
+/config guild key:tournament_default_level value:9-10+
+/config guild key:tournament_default_best_of value:5
+```
+
+`tournament_default_level` is a band (`9`, `10+`, `9-10+`, `9-`, `-10`); unset means
+any level. The others are `tournament_default_bans` and
+`tournament_default_visibility`. None can be set per-user: a match is shared state,
+and two players must not believe different rules apply.
 
 ## Catalog admin editor
 

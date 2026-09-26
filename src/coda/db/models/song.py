@@ -35,7 +35,7 @@ class Song(Base):
     bpm: Mapped[str] = mapped_column(String, nullable=False)
     bpm_base: Mapped[float] = mapped_column(Float, nullable=False)
     time: Mapped[int] = mapped_column(Integer, nullable=False)
-    # Visual theme, stored as the game's numeric side id (0-3); see db.enums.Side.
+    # Visual theme, stored as the game's numeric side id (0-4); see db.enums.Side.
     side: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     world_unlock: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     remote_download: Mapped[bool] = mapped_column(

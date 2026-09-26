@@ -1,19 +1,33 @@
 ---
 type: source
-status: active
+status: superseded
 path: 11-ownership-blob.md
 lines: 155
 dated: "2026-07-21"
 verified: 2026-07-21
 supersedes: []
-superseded_by: []
+superseded_by: ["ownership-worksheet-2026-09-03.md"]
 created: 2026-07-21
-updated: 2026-07-21
-tags: [source, handoffs, ownership, tournaments, unresearched]
+updated: 2026-09-03
+tags: [source, handoffs, ownership, tournaments, superseded]
 aliases: ["11 — Ownership declaration via a static picker + pasted blob"]
 ---
 
 # 11 — Ownership declaration via a static picker + pasted blob
+
+> [!warning] Superseded 2026-09-03 — its premise is wrong
+> This sketch is built on the belief that lowiro *"never reports unlocked state"*.
+> It does. `GET /webapi/user/me` carries `packs`, `singles` and `world_songs`, every
+> id maps onto the catalog exactly, and catalog coverage by derivation is 552/552 —
+> so a credentialed (t2/t3) player needs **no declaration at song grain at all**.
+> Its measurements are also wrong (~110 packs estimated; 63 measured).
+>
+> Read [[ownership-worksheet-2026-09-03]] instead. What survives of this page: the
+> blob shape itself, kept as *one of two* declaration surfaces for t1 (friend-code)
+> players, and its instinct to ask **"can you play this?"** rather than "do you own
+> this?" — which turned out to be the one thing it got right, and for a better
+> reason than it gave. See [[h-ownership-blob-open-before-building]] for the
+> item-by-item resolution.
 
 ## Covers
 

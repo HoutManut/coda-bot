@@ -31,6 +31,9 @@ DB_URL="$(grep -E '^DATABASE_URL=' .env | head -1 | cut -d= -f2-)"
 # Strip the SQLAlchemy +asyncpg driver suffix so libpq understands the URL.
 DB_URL="${DB_URL/+asyncpg/}"
 
+# Catalog content only. Owner config -- config_values, difficulty_search_config,
+# spoiler_versions -- is deliberately out: it describes this deployment, not the
+# songs, and restoring a dump into another one should not carry it over.
 SONG_TABLES=(
   songs song_difficulties
   artists artist_aliases artist_members

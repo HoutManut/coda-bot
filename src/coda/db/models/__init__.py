@@ -31,12 +31,23 @@ from coda.db.models.chardle import (
 from coda.db.models.charter import Charter, DifficultyCharter, SongCharter
 from coda.db.models.difficulty import SongDifficulty
 from coda.db.models.live_update import LiveUpdateChannel, LiveUpdatePref
+from coda.db.models.ownership import OwnedChart
 from coda.db.models.pack import Pack
 from coda.db.models.pending_request import PendingRequest
 from coda.db.models.play_score import PlayScore
 from coda.db.models.search_config import DifficultySearchConfig
 from coda.db.models.song import Song
+from coda.db.models.spoiler import SpoilerVersion
 from coda.db.models.tag import DifficultyTag, SongTag, Tag, TagCategory
+from coda.db.models.tournament import (
+    TournamentChannel,
+    TournamentChart,
+    TournamentMatch,
+    TournamentParticipant,
+    TournamentPoolEntry,
+    TournamentRound,
+    TournamentThread,
+)
 
 __all__ = [
     "Pack",
@@ -65,10 +76,19 @@ __all__ = [
     "LiveUpdatePref",
     "PlayScore",
     "PendingRequest",
+    "OwnedChart",
     "DifficultySearchConfig",
     "ChardlePuzzle",
     "ChardleSession",
     "ChardleGuess",
     "ChardleChannel",
     "ChardlePlayerThread",
+    "SpoilerVersion",
+    "TournamentChannel",
+    "TournamentMatch",
+    "TournamentThread",
+    "TournamentPoolEntry",
+    "TournamentRound",
+    "TournamentChart",
+    "TournamentParticipant",
 ]

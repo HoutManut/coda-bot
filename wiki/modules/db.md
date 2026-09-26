@@ -50,7 +50,7 @@ tables is written explicitly in service code. This is a deliberate constraint
 at import time (`create_async_engine`), which is why `BOT_TOKEN`, `DATABASE_URL`,
 and `FERNET_KEY` are read at import and a missing one breaks the bot, the admin
 app, *and* Alembic in one stroke (see `docs/self-hosting.md`, filed as
-[[self-hosting]]).
+[[sources/self-hosting|self-hosting]]).
 
 `db/enums.py` importing `coda.arcaea.dto.enums` (for `ClearType`/`GaugeModifier`)
 does **not** violate the "`arcaea/` never imports `db/`" rule — the dependency
@@ -132,7 +132,7 @@ are Fernet-encrypted application-side under **one** `FERNET_KEY` env var with
 **no rotation path** — the DB schema stores opaque ciphertext and cannot
 enforce or detect a key change. Changing `FERNET_KEY` orphans every encrypted
 row silently: no constraint violation, no error, just credentials that no
-longer decrypt. See `docs/self-hosting.md` (filed as [[self-hosting]]) and
+longer decrypt. See `docs/self-hosting.md` (filed as [[sources/self-hosting|self-hosting]]) and
 `CLAUDE.md` §Security.
 
 ## What Alembic owns
@@ -156,9 +156,9 @@ the entire persistence layer for coda-bot's catalog and player/score state
 
 ## Related
 
-[[self-hosting]], [[h-straying-preserves-history]],
+[[sources/self-hosting|self-hosting]], [[h-straying-preserves-history]],
 [[h-one-account-per-user]], [[h-login-upgrades-link-in-place]],
 [[h-owner-consent-on-second-claim]], [[h-bot-accounts-excluded-bidirectionally]],
 [[h-no-orm-relationships]], [[tournaments|Tournaments]] (reads `play_scores`, writes
 nothing), [[live-updates|Live Updates]] (unbuilt — reads `play_scores` + `live_update_*`),
-[[b30]], [[Score history backfill]]
+[[potential|Potential]], [[Score history backfill]]

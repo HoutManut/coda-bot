@@ -137,7 +137,7 @@ def _text_value(raw: str) -> str:
 _VERSION_VALUE_RE = re.compile(r"^\d{1,3}(\.\d{1,3})?$")
 
 
-def _version_value(raw: str) -> str:
+def version_value(raw: str) -> str:
     """Validated, not parsed here -- ``:`` still prefix-matches on the raw string,
     while ``filters.py`` splits it part-wise for ``>``/``<`` comparisons (a plain
     float would rank ``5.10`` below ``5.9``)."""
@@ -157,7 +157,7 @@ FIELDS: dict[str, FieldSpec] = {
     "artist": FieldSpec(Kind.ENTITY, _text_value, _EQ_ONLY),
     "charter": FieldSpec(Kind.ENTITY, _text_value, _EQ_ONLY),
     "pack": FieldSpec(Kind.TEXT, _text_value, _EQ_ONLY),
-    "version": FieldSpec(Kind.VERSION, _version_value, _ALL_OPS),
+    "version": FieldSpec(Kind.VERSION, version_value, _ALL_OPS),
     "side": FieldSpec(Kind.ENUM, _side_value, _EQ_ONLY),
     "level": FieldSpec(Kind.NUMERIC, _level_value, _ALL_OPS),
     "cc": FieldSpec(Kind.NUMERIC, _cc_value, _ALL_OPS),

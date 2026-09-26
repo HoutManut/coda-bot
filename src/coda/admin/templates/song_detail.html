@@ -198,9 +198,10 @@
   <h2>Charts</h2>
   {% for diff in diffs %}
   {% set is_err = diff.difficulty.value == 'err' %}
-  <details class="chart {{ difficulty_tint_class(diff.difficulty) }}"
-           style="{{ difficulty_tint_style(diff.difficulty) }}" id="chart-{{ diff.id }}">
-    <summary>{{ difficulty_label(diff.difficulty) }}
+  {% set alt_eligible = diff.difficulty.value in ('byd', 'byd_2') %}
+  <details class="chart {{ difficulty_tint_class(diff.difficulty, diff.alt) }}"
+           style="{{ difficulty_tint_style(diff.difficulty, diff.alt) }}" id="chart-{{ diff.id }}">
+    <summary>{{ difficulty_label(diff.difficulty, diff.alt) }}
       {# Summary is a scan surface, so it uses the list presenters ("?"); the
          inputs below carry the exact round-tripping value. #}
       <span class="chart-stat">Lv <span class="{{ 'sentinel' if is_sentinel(diff.level) }}">{{ list_level(diff.level) }}</span>
@@ -216,6 +217,11 @@
       {% endif %}
       <label>note <input name="note" type="number" value="{{ diff.note }}"></label>
       <label>chart_designer <input name="chart_designer" value="{{ diff.chart_designer or '' }}"></label>
+      {% if alt_eligible %}
+      <label class="check" data-tip="lowiro's alt appearance for this Beyond ('Inscribed')">
+        <input type="checkbox" name="alt" value="1" {{ 'checked' if diff.alt }}> alt
+      </label>
+      {% endif %}
 
       {% if diff.difficulty.value != 'ftr' %}
       <details class="overrides">

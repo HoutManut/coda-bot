@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+from collections.abc import Awaitable, Callable, Set as AbstractSet
 from dataclasses import replace
 
 import hikari
@@ -52,6 +53,10 @@ logger = logging.getLogger(__name__)
 # account is polled and a user is waiting on it.
 STAGGER = (3.0, 12.0)
 
+# The same idea for a key an open tournament round has made hot: still not a
+# burst, but a gap that fits inside HOT_INTERVAL rather than swallowing it.
+HOT_STAGGER = (0.5, 2.0)
+
 # What one path saw: the recent plays, plus every account it covered mapped to
 # its live PTT (None = the player hides it). Ratings are reported for accounts
 # with no recent play too -- "no play" says nothing about whether PTT is hidden.
@@ -65,6 +70,7 @@ async def run(
     posts: PostQueue | None = None,
     *,
     interval: float | None = None,
+    hot: Callable[[], Awaitable[set[PollKey]]] | None = None,
 ) -> None:
     """Poll forever: sleep until the earliest key is due, poll it, signal waiters.
 
@@ -73,6 +79,10 @@ async def run(
     interval and never needs a restart. With it off, due keys are pushed forward
     unpolled -- the clock keeps running and no requests are spent; an on-demand
     refresh (``/recent``) still runs, which is exactly on-demand-only.
+
+    ``hot`` names the keys some other feature wants polled faster right now. It
+    is a callable rather than a set so the loop reads it fresh each tick, and
+    the poller never learns why a key is hot.
     """
     schedule = PollSchedule(
         config.poll_interval if interval is None else interval)
@@ -80,7 +90,10 @@ async def run(
 
     while True:
         pollable = await _pollable_keys(app)
-        schedule.sync(key for key, scheduled in pollable.items() if scheduled)
+        hot_keys = await _hot_keys(hot)
+        schedule.sync(
+            (key for key, scheduled in pollable.items() if scheduled), hot_keys
+        )
 
         targets = await coordinator.wait_for_trigger(schedule.seconds_until_due())
         periodic = targets is None
@@ -97,13 +110,31 @@ async def run(
                     "polling is off; skipping %d due key(s)", len(keys))
             else:
                 covered = await _run_cycle(
-                    store, observations, keys, app, periodic, posts
+                    store, observations, keys, app, periodic, posts, hot_keys
                 )
         except Exception:
             logger.exception("poll cycle failed; retrying next tick")
         finally:
             schedule.reschedule(keys)
             await coordinator.mark_cycle_done(covered)
+
+
+async def _hot_keys(
+    source: Callable[[], Awaitable[set[PollKey]]] | None,
+) -> frozenset[PollKey]:
+    """The keys to poll fast this tick, or nothing if the source failed.
+
+    Never propagates: this loop is how every score in the bot arrives, and a
+    bug in an optional consumer must not stop ingestion. The cost of the
+    fallback is one slow round, not a lost play.
+    """
+    if source is None:
+        return frozenset()
+    try:
+        return frozenset(await source())
+    except Exception:
+        logger.exception("hot cadence lookup failed; polling at the usual gap")
+        return frozenset()
 
 
 async def _polling_enabled() -> bool:
@@ -128,6 +159,7 @@ async def _run_cycle(
     app: hikari.RESTAware,
     periodic: bool,
     posts: PostQueue | None,
+    hot: AbstractSet[PollKey] = frozenset(),
 ) -> set[PollKey]:
     """Poll the given keys and return the ones actually reached.
 
@@ -143,7 +175,9 @@ async def _run_cycle(
     total_new = 0
     for index, key in enumerate(keys):
         if periodic and index:
-            await asyncio.sleep(random.uniform(*STAGGER))
+            await asyncio.sleep(
+                random.uniform(*(HOT_STAGGER if key in hot else STAGGER))
+            )
         try:
             seen, new = await _poll_key(store, observations, key, app, posts)
         except ArcaeaError:

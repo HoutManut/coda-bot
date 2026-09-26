@@ -1,11 +1,11 @@
 ---
 type: question
-status: open
+status: answered
 blocks: ["[[tournaments|Tournaments]]", "song ownership chart-unlock display"]
 source: 11-ownership-blob.md
 created: 2026-07-21
-updated: 2026-07-23
-tags: [question, ownership, tournaments, unresearched]
+updated: 2026-09-03
+tags: [question, ownership, tournaments, answered]
 aliases: ["What has to be settled before the static-picker ownership blob (handoff 11) can be built?"]
 ---
 
@@ -58,4 +58,49 @@ offered; they are named as measurement/decision gaps, not judgment calls.
 
 ## Answer
 
-Not yet answered.
+**Answered 2026-09-03** — see [[ownership-worksheet-2026-09-03]] for the measurement
+and all 146 owner answers, and [[catalog|Catalog]] §Ownership for the settled model.
+
+The question's framing was wrong, and so was handoff 11's. **The ownership data exists on
+the wire.** `GET /webapi/user/me` carries `packs`, `singles` and `world_songs`, every id
+maps onto the catalog exactly with no translation table, and catalog coverage by derivation
+is 552/552. A credentialed player never needed a blob at song grain.
+
+The four gating items, in order:
+
+1. **Real pack count and per-song granularity — measured.** 63 packs, not ~110. After the
+   [[h-world-unlock-corrections|flag corrections]], **49 packs are one checkbox each** (229
+   songs) and **14** need per-song answers, not "roughly 5". The long tail is ~254
+   searchable song toggles, most of it `single`'s 134 individually-sold songs.
+2. **Does the tournament layer want a per-player playable set, and at what grain — yes,
+   chart grain.** Intersect the roster's playable sets, as `pool.owned_by_all` already
+   promises (owner, 2026-09-03). Storage is a row per `(player, song_difficulty_id)`.
+   The sketch's explicit non-coverage of BYD/ETR is now the *most* important part: Eternal
+   needs nothing (`playable(etr) = playable(song)`), and **Beyond needs everything** — 66
+   of its 67 charts are gated and the wire reports them positively only.
+3. **Where the static page lives and who regenerates `songs.json` — mostly moot.** The
+   surface is **both** an inline Discord picker and a static page → blob import (owner,
+   2026-09-03), and the inline half needs no hosting and no regeneration. The ops question
+   survives only for the blob half, and only for t1 players.
+4. **The tier-2 owned-packs route — captured.** It is `/webapi/user/me`, and the prediction
+   that its identifiers "almost certainly do not match one-to-one" is **wrong**: they match
+   exactly, in all three arrays. Graded FACT against one t3 account, 2026-09-03, in
+   [[catalog|Catalog]] §Ownership.
+
+**What replaced the blob as the spine**: the owner's OWNED / UNLOCKED split — acquisition
+and in-game unlock are two orthogonal facts, both reaching chart *and* pack grain, and
+`playable = OWNED ∧ UNLOCKED` with `has_score` as proof of both.
+
+**What is still open**: the [[h-world-unlock-corrections|18 wrong `world_unlock` rows]] are
+decided but unapplied.
+
+**Built 2026-09-06** — the manual half, at chart grain, in `src/coda/ownership/` (see
+[[ownership-module|ownership]]). `/owned` is a pack picker plus a Beyond page; storage is
+`owned_charts`, a row per `(account, song_difficulty_id)`, with packs held as a write-time
+fan-out rather than as rows. `pool.owned_by_all` reads it and is no longer a no-op.
+
+Two of the four items above are now settled *by* code rather than by measurement: item 2's
+chart grain is what shipped, and item 3's hosting question survives only for the blob half,
+which is still unbuilt. **Item 1's per-song answers inside the 14 mixed packs and item 4's
+wire derivation are both deliberately out of v1** — a credentialed player currently declares
+by hand exactly like a t1 player, and the schema is what a later sync would write into.

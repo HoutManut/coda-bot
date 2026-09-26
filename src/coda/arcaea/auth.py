@@ -23,14 +23,15 @@ async def login(email: str, password: str) -> tuple[str, datetime]:
     The response body is only ``{"isLoggedIn": true}``; auth lives entirely in
     the ``sid`` cookie, so a client that ignores Set-Cookie gets nothing usable.
     """
-    body, sid = await request_with_cookie(
+    body, sid, status = await request_with_cookie(
         "POST", "/auth/login", json_body={"email": email, "password": password}
     )
 
-    # Raises InvalidCredentials on the {"error": {...}} envelope. This is the
-    # only call site: the shape is login-specific, and the login success body
-    # has no "success" key at all, so raise_for_envelope never applies here.
-    raise_for_login_envelope(body)
+    # Raises InvalidCredentials on the {"error": {...}} envelope under a genuine
+    # 403. This is the only call site: the shape is login-specific, and the
+    # login success body has no "success" key at all, so raise_for_envelope
+    # never applies here.
+    raise_for_login_envelope(status, body)
 
     if not (isinstance(body, dict) and body.get("isLoggedIn")):
         raise UnexpectedResponse(f"login returned an unrecognised body: {body!r}")

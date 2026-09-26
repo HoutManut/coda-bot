@@ -32,7 +32,7 @@ def cell_text(clue: Clue, facts: ChartFacts) -> str:
         case Clue.VERSION:
             return facts.version or UNKNOWN
         case Clue.SIDE:
-            return Side.from_id(facts.side).value.title()
+            return Side.from_id(facts.side).name.replace("_", " ").title()
         case Clue.BPM:
             return bpm_lines(facts)[0]
         case Clue.NOTE:

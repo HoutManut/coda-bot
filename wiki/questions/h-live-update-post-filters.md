@@ -26,7 +26,7 @@ grinding; posting *nothing but PBs* might miss what users actually want
 notified about.
 
 Exactly one filter is settled: did this play raise the account's tracked b30
-sum ([[b30]], §8 of [[handoff-09-b30]])? Even that one carries a
+sum ([[potential|Potential]], §8 of [[handoff-09-b30]])? Even that one carries a
 constraint that must survive whatever filter design lands on it: it must use
 the bot's own computed b30 sum, never the server's `reported_rating`
 (quantized to 0.01 PTT, permanently NULL for a hidden player) — and for a

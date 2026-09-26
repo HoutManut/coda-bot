@@ -11,6 +11,7 @@ import lightbulb
 from coda import extensions
 from coda.approvals import ApprovalService
 from coda.arcaea import client as arcaea_client
+from coda.catalog import spoilers
 from coda.catalog.search import SearchService
 from coda.chardle import (
     ChardleChannelService,
@@ -20,12 +21,16 @@ from coda.chardle import (
     StatsService,
 )
 from coda.config import config
+from coda.db.session import async_session
 from coda.logging import configure_logging, start_discord, stop_discord
 from coda.players import RegistrationService
 from coda.players.live import LiveUpdateService
-from coda.scores import B30Service, ObservationCache, PollCoordinator, TrackingService
+from coda.scores import PotentialService, ObservationCache, PollCoordinator, TrackingService
 from coda.scores import poller, poster, reconcile
 from coda.scores.suppression import PostSuppressor
+from coda.tournaments import cadence as tournament_cadence
+from coda.tournaments.board import BoardService
+from coda.tournaments.threads import TournamentChannelService
 from coda.settings import ConfigService
 
 logger = logging.getLogger(__name__)
@@ -64,22 +69,34 @@ def build() -> hikari.GatewayBot:
     registry.register_value(ObservationCache, observations)
     registry.register_value(PostSuppressor, suppressor)
     registry.register_value(TrackingService, TrackingService())
-    registry.register_value(B30Service, B30Service())
+    registry.register_value(PotentialService, PotentialService())
     registry.register_value(PuzzleService, PuzzleService())
     registry.register_value(GuessService, GuessService())
     # Holds the per-board FIFO locks, so it must be one instance.
     registry.register_value(SessionService, SessionService())
     registry.register_value(StatsService, StatsService())
     registry.register_value(ChardleChannelService, ChardleChannelService())
+    registry.register_value(TournamentChannelService, TournamentChannelService())
+    # Holds the per-match FIFO locks, so it must be one instance.
+    registry.register_value(BoardService, BoardService())
 
     background_tasks: list[asyncio.Task[None]] = []
 
     @bot.listen(hikari.StartingEvent)
     async def _on_starting(_: hikari.StartingEvent) -> None:
+        # Every render asks whether its chart is spoilered, so the flagged set
+        # is cached in-process and reloaded here rather than queried per render.
+        async with async_session() as db:
+            await spoilers.refresh(db)
         await client.load_extensions_from_package(extensions)
         await client.start()
         background_tasks.append(
-            asyncio.create_task(poller.run(coordinator, observations, bot, posts))
+            asyncio.create_task(
+                poller.run(
+                    coordinator, observations, bot, posts,
+                    hot=tournament_cadence.hot_keys,
+                )
+            )
         )
         background_tasks.append(
             asyncio.create_task(poster.run(posts, bot, suppressor))

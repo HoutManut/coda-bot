@@ -30,12 +30,14 @@ from coda.catalog.jackets import is_night
 from coda.db.models import ArcaeaAccount, PlayerLink, PlayScore, Song, SongDifficulty
 from coda.db.session import async_session
 from coda.players.live import LiveUpdateService
-from coda.scores.b30 import B30Service
+from coda.scores.potential import PotentialService
 from coda.scores.filters import ChannelFloor, Filters, PlayFacts, evaluate
+from coda.catalog.spoilers import chart_spoilered
 from coda.scores.embed import PlayerIdentity, score_embed
 from coda.scores.suppression import Destination, PostSuppressor
 from coda.settings import ConfigService
 from coda.settings.zone import effective_zone
+from coda.utils.container import as_container
 from coda.utils.dm import send_dm
 
 logger = logging.getLogger(__name__)
@@ -122,6 +124,9 @@ class _Delivery:
     destination: Destination
     play_score_id: int
     embed: hikari.Embed
+    # A live post has no viewer to make it ephemeral for, so a spoilered chart
+    # still posts -- blurred, and revealed by whoever chooses to.
+    spoiler: bool = False
 
 
 async def _plan_play(play_id: int, app: hikari.RESTAware) -> list[_Delivery]:
@@ -168,7 +173,7 @@ async def _plan(
         return []
 
     live = LiveUpdateService()
-    facts = PlayFacts(db, B30Service(), row, chart)
+    facts = PlayFacts(db, PotentialService(), row, chart)
     passed: dict[Destination, ChannelFloor | None] = {}
     for discord_id, _ in links:
         enabled, channel_id = await live.resolve_destination(db, discord_id)
@@ -190,11 +195,13 @@ async def _plan(
         return []
 
     player = await _identity(db, app, row.arcaea_account_id, links)
+    spoiler = chart is not None and song is not None and chart_spoilered(song, chart)
     return [
         _Delivery(
             destination=destination,
             play_score_id=row.id,
             embed=await _render(db, row, chart, song, destination, floor, player),
+            spoiler=spoiler,
         )
         for destination, floor in passed.items()
     ]
@@ -358,7 +365,7 @@ class _Sender:
                     delivery.play_score_id,
                 )
                 return
-            await self._deliver(destination, delivery.embed)
+            await self._deliver(destination, delivery.embed, delivery.spoiler)
             self._last_sent[destination] = monotonic()
 
     async def _wait_turn(self, destination: Destination) -> None:
@@ -369,13 +376,18 @@ class _Sender:
         if remaining > 0:
             await asyncio.sleep(remaining)
 
-    async def _deliver(self, destination: Destination, embed: hikari.Embed) -> None:
+    async def _deliver(
+        self, destination: Destination, embed: hikari.Embed, spoiler: bool
+    ) -> None:
         kind, target = destination
+        # A Components V2 message carries no embed; the jacket travels as the
+        # container's own attachment, recovered from the embed's thumbnail.
+        component = as_container(embed, [], spoiler=spoiler)
         if kind == _DM:
-            await send_dm(self._app, target, embed=embed)
+            await send_dm(self._app, target, component=component)
             return
         try:
-            await self._app.rest.create_message(target, embed=embed)
+            await self._app.rest.create_message(target, component=component)
         except hikari.HikariError:
             # A deleted channel or a lost send permission must not take the task
             # down, and must not hold up any other destination.

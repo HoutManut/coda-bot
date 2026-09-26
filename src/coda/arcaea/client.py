@@ -354,11 +354,15 @@ async def request_with_cookie(
     path: str,
     *,
     json_body: dict[str, Any] | None = None,
-) -> tuple[Any, str | None]:
-    """Like :func:`request`, but also returns the ``sid`` the response set.
+) -> tuple[Any, str | None, int]:
+    """Like :func:`request`, but also returns the ``sid`` the response set and
+    the raw HTTP status.
 
     Only login needs this. The sid rotates at every auth boundary, so it must be
-    captured from the login response and never from an earlier one.
+    captured from the login response and never from an earlier one. The status is
+    for login's one legitimate status check (a genuine 403 vs. an error-shaped
+    body under some other status, e.g. a 500 during an outage) -- see
+    :func:`coda.arcaea.errors.raise_for_login_envelope`.
     """
     headers = _headers()
     if json_body is not None:
@@ -372,7 +376,7 @@ async def request_with_cookie(
             async with session.request(method, url, headers=headers, json=json_body) as resp:
                 body = await _decode_json(resp, method, path)
                 cookie = resp.cookies.get("sid")
-                return body, cookie.value if cookie is not None else None
+                return body, cookie.value if cookie is not None else None, resp.status
         except (aiohttp.ClientError, OSError) as exc:
             logger.warning("%s %s transport failure: %r", method, path, exc)
             raise TransportError(f"{method} {path}: {exc!r}") from exc

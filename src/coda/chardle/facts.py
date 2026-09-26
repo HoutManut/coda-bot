@@ -34,6 +34,7 @@ class ChartFacts:
     song_id: str
     name: str
     difficulty_class: DifficultyClass
+    alt: bool
     level: int
     rating: int
     note: int
@@ -148,6 +149,7 @@ def _fact(
         song_id=song.song_id,
         name=effective(song, chart, "name_en"),
         difficulty_class=chart.difficulty,
+        alt=chart.alt,
         level=chart.level,
         rating=chart.rating,
         note=chart.note,

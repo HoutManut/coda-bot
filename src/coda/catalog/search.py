@@ -114,7 +114,19 @@ _CLASS_TOKENS: dict[str, DifficultyClass] = {
     "eternal": DifficultyClass.ETR,
 }
 
+# "Inscribed" is an alt appearance of Beyond, not a class of its own
+# (SongDifficulty.alt), so these tokens mean Beyond *and* narrow to the chart
+# wearing that skin -- the one way to name one of a song's two Beyonds by token.
+_ALT_TOKENS: frozenset[str] = frozenset({"ins", "inscribe", "inscribed"})
+
 _LIST_CAP = 200
+
+
+def _class_intent(token: str) -> tuple[DifficultyClass | None, bool]:
+    """A trailing difficulty token's class, and whether it asked for the alt skin."""
+    if token in _ALT_TOKENS:
+        return DifficultyClass.BYD, True
+    return _CLASS_TOKENS.get(token), False
 
 
 def is_delisted(song: Song) -> bool:
@@ -410,6 +422,7 @@ class SearchService:
         song_id: str,
         difficulty: DifficultyClass | None,
         include_hidden: bool,
+        alt: bool = False,
     ) -> Resolution:
         if difficulty is None:
             return SongHit(song_id)
@@ -425,6 +438,14 @@ class SearchService:
             for c in charts
             if c.difficulty in (DifficultyClass.BYD, DifficultyClass.BYD_2)
         ]
+        # An unset alt flag is a catalog gap as often as a real plain Beyond, so
+        # an alt query with nothing flagged falls through to the Beyond handling
+        # rather than dead-ending on a song that does have one.
+        inscribed = [c for c in beyonds if c.alt] if alt else []
+        if len(inscribed) == 1:
+            return ChartHit(inscribed[0].id)
+        if inscribed:
+            return ChartPick([c.id for c in inscribed])
         if difficulty == DifficultyClass.BYD and len(beyonds) > 1:
             return ChartPick([c.id for c in beyonds])
         if not matched:
@@ -457,12 +478,14 @@ class SearchService:
         if " " not in norm:
             return None
         head, token = norm.rsplit(" ", 1)
-        klass = _CLASS_TOKENS.get(token)
+        klass, alt = _class_intent(token)
         if klass is not None:
             song_id = await self._head_song(db, head, config, include_hidden)
             if song_id is None:
                 return None
-            return await self._apply_difficulty(db, song_id, klass, include_hidden)
+            return await self._apply_difficulty(
+                db, song_id, klass, include_hidden, alt=alt
+            )
 
         chart_id = await self._diff_alias_chart(
             db, token, head, config, include_hidden

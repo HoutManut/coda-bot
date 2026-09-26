@@ -13,11 +13,16 @@ wheels/
 .env
 backups/
 
-# Game assets -- lowiro-copyrighted art + legacy seed data; live data is in the DB
+# Game assets
 assets/*.json
 assets/jackets/
 assets/chardle/
 assets/arcsongs.json
+assets/fonts/*
+
+!assets/fonts/NotoSans-Medium.ttf
+!assets/fonts/NotoSansJP-Medium.ttf
+!assets/fonts/NotoSansMath-Regular.ttf
 
 # OS / editor / tool cruft
 .DS_Store
@@ -31,11 +36,12 @@ assets/arcsongs.json
 .obsidian/cache
 .obsidian/themes/
 .trash/
+.vault-meta/
 
-# Private research/design source docs -- archived outside this repo; wiki/ is the
-# public knowledge layer. Guard in case a copy is ever pulled back in locally.
+# Private research/design source docs
 context/
 *.original.md
+docs/
 
 # Logs
 logs/

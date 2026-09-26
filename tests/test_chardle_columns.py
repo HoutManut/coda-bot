@@ -11,7 +11,6 @@ twenty. See wiki d-chardle-dead-clue-columns.
 from __future__ import annotations
 
 import random
-from dataclasses import replace
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from coda.chardle import tiers
 from coda.chardle.columns import Clue, select_columns
 from coda.chardle.facts import ChartFacts, load_pool
-from coda.db.enums import DifficultyClass
 
 _ROLLS = 200
 
@@ -31,12 +29,12 @@ async def _pool(db: AsyncSession, name: str) -> list[ChartFacts]:
     return pool
 
 
-def _rolled(pool, answer, *, hidden: bool = False) -> set[Clue]:
+def _rolled(pool, answer) -> set[Clue]:
     """Every column that appears in any roll for this (pool, answer)."""
     rng = random.Random(0)
     seen: set[Clue] = set()
     for _ in range(_ROLLS):
-        seen.update(select_columns(pool, answer, class_is_hidden=hidden, rng=rng))
+        seen.update(select_columns(pool, answer, rng=rng))
     return seen
 
 
@@ -77,27 +75,3 @@ async def test_a_constant_column_is_dropped(db: AsyncSession) -> None:
     pool = await _pool(db, "err")
     assert len({fact.side for fact in pool}) == 1
     assert Clue.SIDE not in _rolled(pool, pool[0])
-
-
-def test_class_reads_the_visible_class_not_the_storage_slot() -> None:
-    # byd_2 is a storage slot; both of Last's charts print Beyond. A pool holding
-    # only those two varies on difficulty_class and not on the board, so gating
-    # the column on the raw value would select one that is green on every row.
-    base = ChartFacts(
-        difficulty_id=1,
-        song_id="last",
-        name="Last",
-        difficulty_class=DifficultyClass.BYD,
-        level=20,
-        rating=95,
-        note=888,
-        bpm=190.0,
-        side=1,
-        version="1.0",
-        pack_id="base",
-        pack_name="Arcaea",
-        artists=frozenset({"kobaryo"}),
-        charters=frozenset({"toaster"}),
-    )
-    second = replace(base, difficulty_id=2, difficulty_class=DifficultyClass.BYD_2)
-    assert Clue.CLASS not in _rolled([base, second], base, hidden=True)

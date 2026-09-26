@@ -52,6 +52,13 @@ class SongDifficulty(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
 
+    # Not a difficulty class -- an alternate name/colour lowiro gives some Beyond
+    # charts (e.g. "Inscribed"). Only meaningful on byd/byd_2; see catalog/labels.py
+    # and catalog/colors.py for the appearance it selects.
+    alt: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
     # Overridable: NULL = inherit from the parent song row.
     name_en: Mapped[str | None] = mapped_column(String)
     name_jp: Mapped[str | None] = mapped_column(String)

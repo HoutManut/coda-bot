@@ -6,8 +6,8 @@ purpose: Turns observed plays into durable rows, owns the poll loop, the on-dema
 depends_on: [arcaea, sessions, players, catalog, settings, db]
 used_by: [extensions]
 created: 2026-07-22
-updated: 2026-07-24
-verified: 2026-07-24
+updated: 2026-08-31
+verified: 2026-08-31
 grade: A
 tags: [module, scores, wire]
 aliases: ["scores (module)", "scores"]
@@ -39,8 +39,11 @@ did not previously describe. **Read the code first** — the module docstrings i
 | `PollKey = tuple[str, int]`, `BOT`, `OWN` | `keys.py` | Namespaced poll unit — `("bot", bot_accounts.id)` or `("own", arcaea_accounts.id)` |
 | `poller.run(coordinator, observations, app, *, interval=None)` | `poller.py:55` | The loop. Started as a background task in `bot.py:52` |
 | `reconcile(db)` / `run_reconcile_loop()` | `reconcile.py` | Backfills NULL `song_difficulty_id` every 300 s. Started in `bot.py:54` |
-| `score_embed(row, chart, song, *, locale, night)` | `embed.py` | Renders one play. Shared by `/recent` and (eventually) the live poster |
-| `B30Service.compute(db, account_id, limit=30) -> B30Result` | `b30.py:59` | Best-30, computed fresh on every call — no cache. Ranks every resolved chart's best score, marks the top 30 `counts_toward_b30=True`, returns up to `limit` (capped 50) plus TBA/unresolved exclusion counts. Source-agnostic (friend/own/manual rows rank identically). **No command uses this yet** — backend only, see [[h-b30-cache-stores-sum]] |
+| `score_embed(row, chart, song, *, locale, night)` | `embed.py` | Renders one play. Shared by `/recent`, `/score` and the live poster |
+| `best_play(db, account_id, difficulty_id)` / `scored_charts(db, account_id, ids)` | `best.py` | Personal-best reads behind `/score`: highest score on one chart (ties → earliest play), and which of a song's charts have any stored play. Both hit `ix_play_scores_account_chart_score` |
+| `potential_stat_line(...)` / `rank_line(...)` | `potential_stat.py` | The two lines appended under a score embed — `/recent`'s PTT IMPACT (gated on a freshly-confirmed visible PTT, since it prints rating values) and `/score`'s POSITION (ungated, since a rank is not a rating). Both cut off at the configured reach, `StatMode` (`never`/`b50`/`b60`/`b100`/`always`) |
+| `PotentialService.compute(db, account_id, limit=50) -> PotentialResult` | `potential.py` | The 7.0 model: best-50, its own top-10 counted twice, `/60`. Computed fresh on every call — no cache. Returns up to `limit` (capped 100) entries with `counted`/`doubled` flags, `pool_sum`/`top_sum`, a `.potential` property, `assumed_count`, and TBA/unresolved exclusion counts. Source-agnostic in ranking, NOT in rating: a tier-1 row's clear bonus is inferred ([[d-clear-bonus-impossible-friend-path]]). `rank_for_difficulty_id` reads one chart's place off the same sorted pass, which is what `/recent` and `/score` consume. See [[h-b30-cache-stores-sum]] |
+| `reviewable(result, mode)`, `set_clear_override(...)`, `accept_assumptions(...)` | `clears.py` | The clear-review queue behind `/potential`, and the ONLY writes to `play_scores.clear_override`. `mode` is `unconfirmed` (the queue proper) or `all` (also lists answered rows, so an override is reversible). Both writes scope on `arcaea_account_id` |
 
 ## Layer rules
 
@@ -115,21 +118,58 @@ wrong double-posts every play made by a credentialed user.
 > **one** identity tuple for both, with `wire_play_id` as a secondary guard. The
 > shipped design is the real one.
 
-## b30 — pure, on-demand, never cached
+## potential — pure, on-demand, never cached
 
-`b30.py` (built 2026-07-23, see [[h-b30-cache-stores-sum]]) is a read-only reduction over
+`potential.py` (best-30 built 2026-07-23, ported to the 7.0 best-50 model 2026-08-31; see
+[[h-b30-cache-stores-sum]] for the backend-shape decision) is a read-only reduction over
 `play_scores`, not part of the ingest/poll machinery above — it never writes and holds no
-state between calls. One query pulls this account's `(song_difficulty_id, wire_song_id,
-wire_difficulty, score)` rows; a max-score-per-chart reduction happens in Python, then one
-`outerjoin(SongDifficulty, Song)` fetch resolves the survivors. Three exclusion cases, per
-[[handoff-09-b30]]: delisted (silent drop — reuses `catalog/search.py::is_delisted`,
-promoted from private `_is_delisted` this session so `b30.py` could reuse it rather than
-reimplementing the name-convention check), TBA/unrated CC (`chart.rating <= 0`, dropped
-but counted), unresolved chart (`song_difficulty_id IS NULL`, dropped but counted).
+state between calls. One query pulls **every** row for the account (`id`, wire tuple,
+`score`, `clear_type`, `clear_override`, `time_played`), then one `join(Song)` fetch resolves
+the charts, then the per-chart winner and the ranking are decided in Python. Three exclusion
+cases, per [[handoff-09-b30]]: delisted (silent drop — reuses
+`catalog/search.py::is_delisted`), TBA/unrated CC (`chart.rating <= 0`, dropped but counted),
+unresolved chart (`song_difficulty_id IS NULL`, dropped but counted).
 
-Play rating is computed the same way `catalog/labels.py::chart_rating_line` computes it
-for `/recent` — `calculate_play_rating` + `decode_rating`, both from `utils/`. Never call
-this PTT: it excludes r10 entirely, by design ([[d-r10-impossible-friend-path]]).
+**Every row, not `MAX(score)` per chart** — the one structural change 7.0 forced. Since a
+clear adds a flat `+0.2`, play rating is no longer monotone in score *across rows*: a
+lower-scoring real clear can outrate a higher-scoring fail on the same chart, so selecting by
+top score picks the wrong PLAY, not merely a wrong number for the right one. See
+[[d-clear-bonus-impossible-friend-path]] for the worked example, and `best.py`'s docstring for
+why its own `ORDER BY score DESC` stays correct for `/score` display and must never feed this.
+Ties still break to the earliest play, matching `best_play`.
+
+Clear status is resolved once, by `utils/scoring.py::resolve_clear`, in a fixed precedence:
+wire `clear_type` (fact) → owner `clear_override` (a per-ROW correction, new column on
+`play_scores`) → the `score >= 9,000,000` heuristic. The basis rides along on every entry as
+`ClearStatus.basis` so a renderer can disclose which of the three applied — the three must
+never blend into one number silently. `PotentialResult.assumed_count` reports how many counted
+entries rest on the heuristic.
+
+**Only `ASSUMED` is marked** (`utils/scoring.py::ASSUMED_MARK`, a `~` prefixed to the figure by
+both `chart_rating_line` and `potential_stat_line`). Wire and override go unmarked: both are
+facts, and the earlier `*`-for-override scheme meant a tier-1 row was marked in every state it
+could hold, which discriminates nothing. Unmarked now means "known", so the marked rows are
+exactly the review queue — see [[d-clear-bonus-impossible-friend-path]] §The right handling.
+
+The result is PTT-shaped and may be called PTT — r10 is gone, so nothing is structurally
+missing from the formula any more. It remains an ESTIMATE for two reasons unrelated to the
+formula: incomplete observed history, and the tier-1 clear inference. Never correct it toward
+the server's own `rating` ([[potential|Potential]] §Traps).
+
+## clears — the queue the inference owes the player
+
+`clears.py` is the **only** module that writes `play_scores.clear_override`. It holds two things:
+`reviewable(result, mode)`, which filters a `PotentialResult` down to the entries whose clear
+status is the owner's to state (counted, and resolved from `ASSUMED` — plus `OVERRIDE` in `all`
+mode, which is the only route back to a correction already made), and the two writes
+(`set_clear_override`, `accept_assumptions`), each scoped by `arcaea_account_id` in the `WHERE`.
+
+The filter is what bounds the queue: counted-only means at most `POOL` rows regardless of how
+much history exists, and it regrows only when a new PB or an override flip promotes a different
+row into a chart's winning slot. `/potential` (`extensions/potential.py`) is the surface —
+pull-only, one card at a time, rebuilding the queue from source on every interaction so a
+cascade-promoted row appears without a second invocation. See [[h-clear-override-review-queue]]
+for why it is not `/score review`.
 
 ## Traffic shape is a security property, not a perf tweak
 

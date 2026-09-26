@@ -8,11 +8,11 @@ of dedicated in-game accounts, friends you when you register, and reads your rec
 plays from the friends list. See **[How it works, and what it stores](#how-it-works-and-what-it-stores)**
 below.
 
-Because it keeps every play it sees, it also builds a **b30** for you over time — and,
-with a linked Arcaea login, an **r30** and a full **PTT**, using the game's own formula
-and shown to more decimal places than the game gives you. It's a tracker rather than a
-copy of lowiro's number: it knows the plays it has watched, so it starts empty and fills
-in as you play.
+Because it keeps every play it sees, it also builds a **b50** and a **PTT** for you over
+time, using the game's own formula and shown to more decimal places than the game gives
+you — exactly with a linked Arcaea login, and from a disclosed estimate of each play's
+clear status without one. It's a tracker rather than a copy of lowiro's number: it knows
+the plays it has watched, so it starts empty and fills in as you play.
 
 Built on [hikari](https://github.com/hikari-py/hikari) +
 [lightbulb v3](https://github.com/tandemdude/hikari-lightbulb), Python 3.14,
@@ -39,6 +39,7 @@ to risk sending your logins to someone else, you might want to try
 | `/register`                                        | Links your Arcaea account. Use a friend code (recommended) or an Arcaea login (optional). |
 | `/unregister`                                      | Stop tracking your Arcaea account. Your stored plays are kept.                            |
 | `/recent`                                          | Show your most recent play.                                                               |
+| `/potential`                                       | Show the plays your potential is averaged from, and review any assumed clears.            |
 | `/song`                                            | Look up a song, a chart, or browse by level or by CC.                                     |
 | `/calc`                                            | Calculates the play rating for a score.                                                   |
 | `/linkinfo`                                        | Explains what an Arcaea login link does, and why the link is optional.                    |
@@ -72,9 +73,9 @@ This project is under active development.
 - [x] Recent play display (`/recent`) and play-rating maths (`/calc`)
 - [x] Song and chart lookup (`/song`)
 - [x] Live score posting to DMs or channels with filters
-- [x] b30 tracking and display (works on both tiers)
+- [x] b50 / PTT tracking and display (works on both tiers)
 - [x] Mini games (Chardle!)
-- [ ] r10 and computed PTT (needs a linked Arcaea login)
+- [ ] Reviewing the bot's clear-status guesses (friend-code tier)
 - [ ] t0: manual score entry
 - [ ] Profile / best-scores commands
 - [ ] Tournament module
@@ -89,13 +90,13 @@ Arcaea has no public API. coda-bot reads score through a player's own account.
 It uses 2 methods, called tiers, plus a third, automatic tier for Arcaea Online
 subscribers.
 
-Additionally, manual score input just for b30 tracking is supported. This does not touch the API.
+Additionally, manual score input just for b50 tracking is supported. This does not touch the API.
 
 | Tier                          | How it reads                                                                                                                                                                                                                                                                                                                       | What it stores                                                                                                               |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| None                          | Nothing is read from Arcaea at all. Feeds b30 only; no r10 or PTT.                                                                                                                                                                                                                                                                 | Only the song/chart and score values you type in. No friend code, no login, no in-game identity at all.                      |
-| **Friend code** (default)     | One of the bot's dedicated in-game accounts friends you, and your recent plays are read off its friends list. No password. **Enough for ~90% of the bot** — tracking, live updates, b30, tournaments.                                                                                                                              | Your 9-digit friend code, in-game user id, display name, which bot account friended you, and every play the poller observes. |
-| **Arcaea login** (optional)   | coda-bot logs in and requests scores on your behalf. This method returns more data: full note counts (pure, far, and lost notes), and the clear and gauge data that r10 needs. Only this tier can calculate r10 and PTT. Delete this link at any time with `/unlink`; your scores then continue to track through your friend code. | The above, plus your Arcaea **email and password**, the session cookie, and your Arcaea Online expiry.                       |
+| None                          | Nothing is read from Arcaea at all. Feeds b50 from what you type in.                                                                                                                                                                                                                                                                 | Only the song/chart and score values you type in. No friend code, no login, no in-game identity at all.                      |
+| **Friend code** (default)     | One of the bot's dedicated in-game accounts friends you, and your recent plays are read off its friends list. No password. **Enough for ~90% of the bot** — tracking, live updates, b50, tournaments.                                                                                                                              | Your 9-digit friend code, in-game user id, display name, which bot account friended you, and every play the poller observes. |
+| **Arcaea login** (optional)   | coda-bot logs in and requests scores on your behalf. This method returns more data: full note counts (pure, far, and lost notes), and the clear and gauge data. Only this tier knows whether a play cleared, so only it computes PTT exactly rather than from an estimate. Delete this link at any time with `/unlink`; your scores then continue to track through your friend code. | The above, plus your Arcaea **email and password**, the session cookie, and your Arcaea Online expiry.                       |
 | **Arcaea Online** (automatic) | If your linked login has an active Arcaea Online subscription, coda-bot also reads your best scores, and lowiro's own play-rating numbers.                                                                                                                                                                                         | Same as above.                                                                                                               |
 
 Discord side: your user id, your `/liveupdates` destination choice, and any `/config`
@@ -186,7 +187,7 @@ bot, you accept these risks.**
 You'll need Python 3.14 + [`uv`](https://docs.astral.sh/uv/), Postgres, a Discord bot
 token, and at least one Arcaea account to act as the bot's in-game account.
 
-For the full guide, read **[docs/self-hosting.md](docs/self-hosting.md)**. This guide
+For the full guide, read **[self-hosting.md](self-hosting.md)**. This guide
 covers the configuration reference, catalog seed procedures, bot-account setup, the
 admin editor, and notes about the lowiro API layer.
 

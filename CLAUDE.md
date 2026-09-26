@@ -6,7 +6,7 @@ Guide for Claude Code (claude.ai/code) when work this repo.
 
 `coda-bot` answer Arcaea (rhythm game) queries on Discord — player recent scores, song/chart data.
 
-Built so far: song catalog + admin editor, settings system, lowiro API layer, session pool, registration (`/register`), live-update config, score tracking (poll loop both read paths, storage, chart resolution + reconcile, `/recent`, `/tracking`, live-update poster + post filters), chardle (Wordle over the catalog; emoji renderer is temporary), `/run` owner terminal (bot-wide config + reconcile, created only in `OWNER_GUILD_IDS`). **Not built**: tournaments.
+Built so far: song catalog + admin editor, settings system, lowiro API layer, session pool, registration (`/register`), live-update config, score tracking (poll loop both read paths, storage, chart resolution + reconcile, `/recent`, `/score`, `/potential` + clear review, `/tracking`, live-update poster + post filters), song ownership (`/owned` — pack picker + Beyond page, stored per chart, feeds the tournament pool filter; manual declaration only, no wire sync), chardle (Wordle over the catalog; emoji renderer is temporary), `/run` owner terminal (bot-wide config + reconcile + spoiler, created only in `OWNER_GUILD_IDS`), spoiler mode (owner flags a game version; its charts render blurred and default to ephemeral), tournaments (quick match: filter-generated chart pools, head-to-head pick/ban, windows scored off `play_scores`, one thread per crew, `/tournament`; the board is text for now and the formats layer is not built).
 
 See `CODING_STYLE.md` for hard rules on function/file size, comments, error handling, abstraction, naming, typing, testing. See `wiki/` (below) for everything below this file level of detail.
 
@@ -47,6 +47,7 @@ src/coda/
   sessions/   BotSession + SessionPool. The ONLY module that knows what a sid is
   players/    registration, reserved codes, live-update destinations
   catalog/    song/chart seeding, aliases, resolution
+  ownership/  what each player can play. Stored per CHART; a pack is a write-time fan-out, never a row
   settings/   DB-backed scoped config (/config). `audience` on a key decides who sees it exists
   ops/        owner operations behind /run. Never imports hikari
   extensions/ hikari/lightbulb slash commands, auto-loaded from this package
@@ -70,12 +71,15 @@ Obsidian vault, project knowledge base: domain pages, module/flow/decision/gotch
 | Page | Covers |
 |---|---|
 | `wiki/domains/catalog.md` | Songs, difficulties, packs, artists/charters, level/CC encoding, aliases, inheritance |
+| `wiki/decisions/h-spoiler-is-a-render-mode.md` | Spoilered versions: what blurs, what stays findable, why every chart render is Components V2 |
 | `wiki/domains/scoring.md` | Score formula, pure/far/lost, grades, clear types, gauge — hard-gauge loss submits early |
-| `wiki/domains/potential.md` | Play rating, b30/r10, PTT encoding — b30 works any tier, r10 impossible on friend path |
+| `wiki/domains/potential.md` | Play rating, best-50 + doubled top-10, PTT encoding — the 7.0 clear bonus is impossible on the friend path, so tier 1 infers it |
 | `wiki/domains/score-mapping.md` | Wire `(song_id, difficulty)` → `song_difficulties` row; `byd_2` needs `game_song_id` |
 | `wiki/domains/auth-and-sessions.md` | Auth, sessions, friend endpoints — every claim graded, check grade |
 | `wiki/modules/*.md` | `arcaea/`, `sessions/`, `players/`, `scores/`, `db/` — layout, envelopes, DTOs, pool, cadence |
-| `wiki/domains/tournaments.md` | Tournament module design — not built |
+| `wiki/modules/tournaments-module.md` | `tournaments/` — layout, invariants, the hot lane, and the six deltas from handoff 13 |
+| `wiki/modules/ownership-module.md` | `ownership/` — the predicate pair (grant narrow, clear wide), why Beyond is asked not granted, picker labelling |
+| `wiki/domains/tournaments.md` | Tournament policy — validity, windows, ranking, casual song mode. Formats layer still unbuilt |
 | `wiki/questions/` | Open questions + designed-but-unbuilt work — not settled reference |
 
 **Precedence: live wire > `src/` > this file > `wiki/`.** Wiki page carries `verified:` date, can go stale; if wire contradicts page, re-capture + update page — never "fix" code against stale claim, never let wiki page be reason to change code.

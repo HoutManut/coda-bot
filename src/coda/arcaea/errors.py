@@ -95,7 +95,7 @@ _CODES: dict[int, type[ArcaeaError]] = {
 }
 
 
-def raise_for_login_envelope(body: Any) -> None:
+def raise_for_login_envelope(status: int, body: Any) -> None:
     """Raise :class:`InvalidCredentials` if ``body`` is /auth/login's rejection.
 
     Kept separate from :func:`raise_for_envelope` on purpose: the
@@ -103,10 +103,24 @@ def raise_for_login_envelope(body: Any) -> None:
     may interpret it. A ``/webapi/*`` body that ever grows an ``error`` key is
     an API change to surface as UnexpectedResponse -- not a reason to declare
     working credentials terminally dead.
+
+    Terminal ONLY on an actual HTTP 403 -- lowiro's real "wrong password" reply.
+    A Cloudflare/gateway error page during an outage can carry the exact same
+    ``{"error": {...}}`` shape under a 500, and that must never be read as a
+    dead credential: it deactivates a hand-made, unreplaceable bot account for
+    something that fixes itself when lowiro comes back. See
+    wiki/gotchas/w-login-403-not-status-gated.md.
     """
     error = body.get("error") if isinstance(body, dict) else None
-    if isinstance(error, dict):
-        raise InvalidCredentials(f"login rejected: {error.get('name')} {error.get('message')}")
+    if not isinstance(error, dict):
+        return
+    detail = f"{error.get('name')} {error.get('message')}"
+    if status != 403:
+        raise UnexpectedResponse(
+            f"login returned an error-shaped body under HTTP {status}, not 403 "
+            f"-- treating as transient, not a dead credential: {detail}"
+        )
+    raise InvalidCredentials(f"login rejected: {detail}")
 
 
 def raise_for_envelope(body: Any) -> dict[str, Any]:

@@ -108,12 +108,12 @@ def is_sentinel(value: int) -> bool:
 
 def side_label(value: int) -> str:
     """Numeric side id (0-3) -> display label ("Light", "Conflict", ...)."""
-    return Side.from_id(value).name.title()
+    return Side.from_id(value).name.replace("_", " ").title()
 
 
 def side_choices() -> list[tuple[int, str]]:
     """(id, label) pairs for a side dropdown, in id order."""
-    return [(i, Side.from_id(i).name.title()) for i in range(len(Side))]
+    return [(i, Side.from_id(i).name.replace("_", " ").title()) for i in range(len(Side))]
 
 
 # --- difficulty -----------------------------------------------------------
@@ -139,8 +139,20 @@ _DIFFICULTY_LABELS: dict[DifficultyClass, str] = {
     DifficultyClass.ERR: "Error",
 }
 
+# lowiro's alt appearance for some Beyond charts (SongDifficulty.alt) -- not a
+# class of its own, see coda.catalog.labels.
+_ALT_DIFFICULTY_LABELS: dict[DifficultyClass, str] = {
+    DifficultyClass.BYD: "Inscribed",
+    DifficultyClass.BYD_2: "Inscribed",
+}
 
-def difficulty_label(diff: DifficultyClass) -> str:
+# Classes the "alt" checkbox is offered for.
+ALT_ELIGIBLE: frozenset[DifficultyClass] = frozenset(_ALT_DIFFICULTY_LABELS)
+
+
+def difficulty_label(diff: DifficultyClass, alt: bool = False) -> str:
+    if alt and diff in _ALT_DIFFICULTY_LABELS:
+        return _ALT_DIFFICULTY_LABELS[diff]
     return _DIFFICULTY_LABELS[diff]
 
 

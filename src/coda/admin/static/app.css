@@ -33,7 +33,7 @@
   --tint-edge: oklch(0.580 0.120 var(--h));  /* side edge ON the page bg     */
   --tint-ink:  oklch(0.500 0.110 var(--h));  /* chip text, focus ring        */
 }
-/* A near-neutral source (Colorless/Lephon) has no hue to derive from, so the
+/* A near-neutral source (Achromic/Lephon) has no hue to derive from, so the
    roles fall back to the page greys rather than inventing a colour. */
 .tinted.neutral {
   --tint-bg: var(--bg);
@@ -114,6 +114,8 @@ form { display: flex; flex-wrap: wrap; gap: 1rem 1.2rem; align-items: flex-end; 
 form.inline { align-items: flex-end; gap: .6rem; }
 /* Lay sibling forms (e.g. Save + Delete) on one bottom-aligned row. */
 .form-row { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: flex-end; }
+/* Wraps the date+offset label pair without disturbing the parent flex layout. */
+.date-pair { display: contents; }
 label {
   display: flex; flex-direction: column; gap: .3rem;
   font-size: .72rem; font-weight: 600; letter-spacing: .04em;
@@ -204,12 +206,12 @@ tbody tr:hover { background: #f6f5f2; }
   gap: .15rem .7rem; padding: .5rem .7rem;
 }
 .rows.songs .row-head, .rows.songs .row {
-  grid-template-columns: 3.2rem 44px minmax(0, 1fr) auto;
+  grid-template-columns: 2.2rem 44px minmax(0, 1fr) auto;
 }
 .rows.songs .row { grid-template-areas: "idx jacket name id" ". jacket line2 line2"; }
 .rows.songs .row-head { grid-template-areas: "idx jacket name id"; }
 .rows.charts .row-head, .rows.charts .row {
-  grid-template-columns: 3.2rem 44px minmax(0, 1fr) auto;
+  grid-template-columns: 2.2rem 44px minmax(0, 1fr) auto;
 }
 .rows.charts .row { grid-template-areas: "idx jacket name id" ". jacket line2 line2"; }
 .rows.charts .row-head { grid-template-areas: "idx jacket name id"; }

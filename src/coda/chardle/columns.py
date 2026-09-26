@@ -42,7 +42,7 @@ CANONICAL_ORDER: tuple[Clue, ...] = (
     Clue.NOTE,
 )
 
-MAX_COLUMNS = 6
+MAX_COLUMNS = 7
 
 # At most one from each: CC determines level, and a pack ships at a version.
 REDUNDANT_GROUPS: tuple[tuple[Clue, ...], ...] = (

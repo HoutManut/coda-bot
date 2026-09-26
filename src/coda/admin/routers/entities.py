@@ -139,6 +139,7 @@ async def _detail(
             "song_id": d.song_id,
             "difficulty_id": d.id,
             "difficulty": d.difficulty,
+            "alt": d.alt,
             "name": d.name_en or song_name,
             "as_name": None,
             "idx": idx,
@@ -156,7 +157,10 @@ async def _detail(
     responsible_songs: list[dict] = []
     if spec.kind == "charters":
         rdate = func.coalesce(SongDifficulty.date, Song.date)
-        cols = (Song.song_id, Song.name_en, Song.idx, rdate, SongDifficulty.difficulty)
+        cols = (
+            Song.song_id, Song.name_en, Song.idx, rdate,
+            SongDifficulty.difficulty, SongDifficulty.alt,
+        )
         inherited = (
             select(*cols)
             .join(SongDifficulty, SongDifficulty.song_id == Song.song_id)
@@ -179,12 +183,12 @@ async def _detail(
         # Key by (song, resolved date): charts of one song that release on
         # different dates (e.g. a later BYD) split into separate rows.
         groups: dict[tuple, dict] = {}
-        for song_id, name_en, idx, date, difficulty in rows:
+        for song_id, name_en, idx, date, difficulty, alt in rows:
             g = groups.setdefault(
                 (song_id, date),
-                {"song_id": song_id, "name": name_en, "idx": idx, "date": date, "diffs": set()},
+                {"song_id": song_id, "name": name_en, "idx": idx, "date": date, "diffs": {}},
             )
-            g["diffs"].add(difficulty)
+            g["diffs"][difficulty] = alt
         # Total chart count per involved song — to drop the badges when the
         # charter covers the whole song (full credit needs no per-chart detail).
         totals = {
@@ -204,7 +208,8 @@ async def _detail(
             # The merged idx/name view drops them client-side via data-total too.
             full = len(g["diffs"]) >= g["total"]
             g["diffs"] = [] if full else sorted(
-                g["diffs"], key=lambda d: d.ordinal if d.ordinal is not None else 99
+                g["diffs"].items(),
+                key=lambda item: item[0].ordinal if item[0].ordinal is not None else 99,
             )
 
     members = []
@@ -261,6 +266,7 @@ async def _detail(
                     "song_id": d.song_id,
                     "difficulty_id": d.id,
                     "difficulty": d.difficulty,
+                    "alt": d.alt,
                     "name": d.name_en or song_name,
                     "as_name": uname,
                     "idx": idx,
@@ -276,19 +282,20 @@ async def _detail(
         for s in songs:
             entries.append(
                 {"idx": s.idx, "date": s.date, "song_id": s.song_id, "name": s.name_en,
-                 "note": None, "difficulty": None, "difficulty_id": None}
+                 "note": None, "difficulty": None, "alt": None, "difficulty_id": None}
             )
         for vs in via_songs:
             s = vs["song"]
             entries.append(
                 {"idx": s.idx, "date": s.date, "song_id": s.song_id, "name": s.name_en,
-                 "note": f"as {vs['as_name']}", "difficulty": None, "difficulty_id": None}
+                 "note": f"as {vs['as_name']}", "difficulty": None, "alt": None, "difficulty_id": None}
             )
         for c in chart_credits:
             note = f"as {c['as_name']}" if c["as_name"] else None
             entries.append(
                 {"idx": c["idx"], "date": c["date"], "song_id": c["song_id"], "name": c["name"],
-                 "note": note, "difficulty": c["difficulty"], "difficulty_id": c["difficulty_id"]}
+                 "note": note, "difficulty": c["difficulty"], "alt": c["alt"],
+                 "difficulty_id": c["difficulty_id"]}
             )
         entries.sort(key=lambda e: e["idx"])
 

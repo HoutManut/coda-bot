@@ -2,13 +2,13 @@
 
 ``colors.py`` is the source of truth for **hue only**. Its values are tuned for
 Discord embed strips on dark chrome, so dropping them onto the admin's light page
-is inconsistent -- ``COLORLESS`` vanishes into the background while ``BYD``
+is inconsistent -- ``ACHROMIC`` vanishes into the background while ``BYD``
 dominates a row it only means to label. Instead each colour is converted to OKLCH
 once, the hue angle kept and lightness/chroma discarded; CSS composes every role
 from that angle at fixed L/C, so all tints carry equal visual weight and a
 scanning eye reads position and label rather than "the red one is louder".
 
-Near-neutral sources have no meaningful hue (``COLORLESS`` and ``LEPHON`` measure
+Near-neutral sources have no meaningful hue (``ACHROMIC`` and ``LEPHON`` measure
 chroma 0.012), so :func:`hue_of` returns ``None`` and the caller emits the
 ``neutral`` class instead of a hue variable.
 """
@@ -17,11 +17,11 @@ from __future__ import annotations
 
 from math import atan2, degrees, sqrt
 
-from coda.catalog.colors import CLASS_COLORS, SIDE_COLORS
+from coda.catalog.colors import CLASS_COLORS, SIDE_COLORS, class_color
 from coda.db.enums import DifficultyClass, Side
 
 # Below this OKLCH chroma a colour carries no usable hue: forcing the role chroma
-# onto its angle would invent a colour (the Colorless side would render mustard).
+# onto its angle would invent a colour (the Achromic side would render mustard).
 _NEUTRAL_C = 0.02
 
 
@@ -94,6 +94,13 @@ CHIP_LABELS: dict[DifficultyClass, str] = {
     DifficultyClass.ERR: "ERR",
 }
 
+# lowiro's alt appearance ("Inscribed"). BYD_2 keeps its "²" mark even when
+# alt, so a second Beyond stays told apart from the first.
+ALT_CHIP_LABELS: dict[DifficultyClass, str] = {
+    DifficultyClass.BYD: "INS",
+    DifficultyClass.BYD_2: "INS²",
+}
+
 
 # Templates compose these into their own ``class``/``style`` attributes, so the
 # two halves are returned separately rather than as one attribute blob.
@@ -111,14 +118,14 @@ def _style(hue: float | None) -> str:
     return "" if hue is None else f"--h:{hue:.1f}"
 
 
-def difficulty_tint_class(diff: DifficultyClass) -> str:
+def difficulty_tint_class(diff: DifficultyClass, alt: bool = False) -> str:
     """Tint classes for a difficulty chip or chart accordion."""
-    return _classes(hue_of(CLASS_COLORS[diff]), diff in DASHED_CLASSES)
+    return _classes(hue_of(class_color(diff, alt)), diff in DASHED_CLASSES)
 
 
-def difficulty_tint_style(diff: DifficultyClass) -> str:
+def difficulty_tint_style(diff: DifficultyClass, alt: bool = False) -> str:
     """Hue custom property for a difficulty chip or chart accordion."""
-    return _style(hue_of(CLASS_COLORS[diff]))
+    return _style(hue_of(class_color(diff, alt)))
 
 
 def side_tint_class(side: int) -> str:
@@ -131,6 +138,8 @@ def side_tint_style(side: int) -> str:
     return _style(hue_of(SIDE_COLORS[Side.from_id(side)]))
 
 
-def chip_label(diff: DifficultyClass) -> str:
+def chip_label(diff: DifficultyClass, alt: bool = False) -> str:
     """Short uppercase label for a difficulty chip."""
+    if alt and diff in ALT_CHIP_LABELS:
+        return ALT_CHIP_LABELS[diff]
     return CHIP_LABELS[diff]

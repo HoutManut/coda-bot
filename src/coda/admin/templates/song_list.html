@@ -124,8 +124,8 @@
        must not show the song's cover — that difference is often what is being
        checked. #}
     {% set jacket = chart.jacket if chart.jacket is not none else song.jacket %}
-    <a class="row {{ difficulty_tint_class(chart.difficulty) }}"
-       style="{{ difficulty_tint_style(chart.difficulty) }}"
+    <a class="row {{ difficulty_tint_class(chart.difficulty, chart.alt) }}"
+       style="{{ difficulty_tint_style(chart.difficulty, chart.alt) }}"
        href="/songs/{{ song.song_id }}#chart-{{ chart.id }}">
       <span class="r-idx mono">{{ song.idx }}</span>
       {% if jacket %}
@@ -138,7 +138,7 @@
       <code class="r-id">{{ song.song_id }}</code>
       <span class="r-line2">
         <span class="r-meta">
-          {{ diff_chip(chart.difficulty) }}
+          {{ diff_chip(chart.difficulty, alt=chart.alt) }}
           <span class="r-lv{{ ' sentinel' if is_sentinel(chart.level) }}">Lv {{ list_level(chart.level) }}</span>
           <span class="r-sep">·</span>
           <span class="r-cc{{ ' sentinel' if is_sentinel(chart.rating) }}">CC {{ list_rating(chart.rating) }}</span>
@@ -181,7 +181,7 @@
         </span>
         <span class="r-strip">
           {% for chart in strips.get(song.song_id, []) %}
-          {{ diff_chip(chart.difficulty) }}<span class="r-lv{{ ' sentinel' if is_sentinel(chart.level) }}">{{ list_level(chart.level) }}</span>
+          {{ diff_chip(chart.difficulty, alt=chart.alt) }}<span class="r-lv{{ ' sentinel' if is_sentinel(chart.level) }}">{{ list_level(chart.level) }}</span>
           {% endfor %}
         </span>
       </span>

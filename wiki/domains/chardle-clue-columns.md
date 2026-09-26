@@ -4,7 +4,7 @@ status: active
 source: Tenniel prototype (`classes/chardle.py`, `plugins/chardle.py`, 2024-09/10, archived outside this repo) + design session 2026-07-27
 verified: 2026-07-28
 created: 2026-07-29
-updated: 2026-07-29
+updated: 2026-08-31
 tags: [domain, chardle, game]
 aliases: ["Chardle Clue Columns", "Chardle — Clue Columns"]
 ---
@@ -21,8 +21,9 @@ rules. Pool, stats, rules, and prototype provenance live in
 ## Clue columns
 
 A puzzle freezes an ordered column set at creation. `title` is always present. The rest
-are drawn per puzzle, so the board's *shape* is itself a variable — 20 possible shapes on
-an ordinary tier, 40 on extras, measured against the live catalog 2026-07-28. That claim
+are drawn per puzzle, so the board's *shape* is itself a variable — 56 possible shapes,
+measured against the live catalog 2026-08-31 at the 7-column cap (extras rolls the same
+set as an ordinary tier: the `class` column below was never built). That claim
 was **false for the first day of the build**; see
 [[d-chardle-dead-clue-columns]] §The over-correction that shipped first.
 
@@ -46,7 +47,7 @@ legend each morning.
 | `artist` | link sets equal | sets intersect | disjoint | no |
 | `charter` | link sets equal | sets intersect | disjoint | no |
 | `pack` | same pack | same series, different pack | unrelated | no |
-| `side` | same side | — | different | no |
+| `side` | same side | Achromic / Lephon / Dark Lephon, wrong one of the three | Light or Conflict mismatch | no |
 | `version` | equal | same major | different major | **yes** |
 | `level` | equal | within ±4 stored (±2 game levels) | beyond | **yes** |
 | `rating` (CC) | equal | same whole CC number | different whole CC number | **yes** |
@@ -60,6 +61,15 @@ front.
 
 Arrows show on **both** yellow and red — direction is never withheld. That generosity is
 what keeps a 6-attempt board solvable.
+
+### The three Lephon-adjacent sides score as one family
+
+`side` is the one column whose yellow is not a distance. Arcaea presents Achromic, Lephon
+and Dark Lephon as a single side to the player — the song list offers Light, Conflict and
+Colorless and nothing else — so a guess that lands inside that family but names the wrong
+one of the three is a near miss, not a wrong answer (owner, 2026-08-31). Light and Conflict
+are untouched: they stand alone, and a mismatch against either is red. The cell still prints
+the chart's **true** side, so the family is visible on the board rather than inferred.
 
 `rating` does not use a distance window like `level`/`bpm`/`note` — it mirrors `version`
 instead: CC is stored `x10`, so `guess // 10 == answer // 10` is "same whole CC number"

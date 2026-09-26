@@ -8,7 +8,7 @@ verified: 2026-07-17
 supersedes: []
 superseded_by: []
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 tags: [source, tournaments, unbuilt]
 aliases: ["Arcaea Tournament Layer — Implementation Doc"]
 ---
@@ -42,15 +42,31 @@ built.**
 - Window duration `clamp(2t, 100s, 5m)`; `t=0` is a sentinel, floors
   regardless. See [[h-tournament-attempt-overhead]] for the one open input
   (attempt overhead) this formula depends on.
+  **Superseded 2026-09-02** — the live rule is `clamp(2t, 200s, 500s)`, `t` is
+  the max across the round's chart set, and `t=0` resolves to the **ceiling**,
+  not the floor. See [[tournaments|Tournaments]] §3.
 - Song ownership is **out of scope by decision** (owner, 2026-07-17):
   `pack_id`/`Song.world_unlock` do not encode whether a song is owned. This
   connects directly to [[handoff-11-ownership-blob]] (sketch only).
 
 ## Contradicts / reversed by
 
-None found. This doc is internally self-consistent and consistent with the
-shipped poller/`play_scores` schema it assumes exists. It predates and is not
-contradicted by any handoff in this ingest.
+Internally self-consistent and consistent with the shipped
+poller/`play_scores` schema it assumes exists; not contradicted by any handoff
+in the 2026-07-21 ingest.
+
+**Three claims reversed by the 2026-09-02 design session**, per the vault's
+"a later decision outranks an older source" rule:
+
+| Source claim | Now |
+|---|---|
+| A round is one chart | An eligible **chart set** — casual song mode lets each player pick a difficulty |
+| Window `clamp(2t, 100s, 5m)`, `t=0` floors | `clamp(2t, 200s, 500s)`, `t` = max across the set, `t=0` → ceiling |
+| Hard gauge under `first` "cannot be enforced on tier 1" | Nothing to enforce — discarding a play creates a reroll ([[h-every-valid-score-counts]]) |
+
+Ranking is additionally pinned to raw `score` ([[h-score-is-the-only-ranking-value]]),
+which the source doc left open. Build from
+[[handoff-13-tournaments|handoff 13]], not from this page.
 
 ## Feeds
 

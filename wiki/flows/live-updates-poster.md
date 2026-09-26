@@ -152,4 +152,4 @@ linked user triggered the send.
 [[live-updates|Live Updates (poster)]] · [[live-updates-filters|Live Updates — Filters]] ·
 [[live-updates-suppression|Live Updates — Suppression]] ·
 [[scores|scores (module)]], [[score-poll-loop|Score Poll Loop]],
-[[chart-resolution|Chart Resolution]], [[b30]], [[registration|Registration]]
+[[chart-resolution|Chart Resolution]], [[potential|Potential]], [[registration|Registration]]

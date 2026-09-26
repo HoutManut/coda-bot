@@ -15,7 +15,7 @@ and touches nobody else's clock.
 from __future__ import annotations
 
 import random
-from collections.abc import Iterable
+from collections.abc import Iterable, Set as AbstractSet
 from time import monotonic
 
 from coda.scores.keys import PollKey
@@ -30,6 +30,14 @@ JITTER = 0.4
 # irregular but not clustered.
 CORRECTION = 0.3
 
+# The gap for a key an open tournament round has made hot. A round window is
+# 200-500 s, so this resolves the board and the early all-scored exit to well
+# under 2% of the shortest one. It is not the handoff's 5 s: STAGGER already
+# idles seconds between keys inside a tick, so 5 s would need the stagger
+# bypassed and _spread rewritten for two moduli, against an unmeasured rate
+# limit -- see wiki/questions/h-real-rate-limit-shape-unknown.md.
+HOT_INTERVAL = 15.0
+
 
 class PollSchedule:
     """Monotonic due time per poll key, with phases spread across the interval."""
@@ -37,8 +45,11 @@ class PollSchedule:
     def __init__(self, interval: float) -> None:
         self._interval = interval
         self._due: dict[PollKey, float] = {}
+        self._hot: frozenset[PollKey] = frozenset()
 
-    def sync(self, pollable: Iterable[PollKey]) -> None:
+    def sync(
+        self, pollable: Iterable[PollKey], hot: AbstractSet[PollKey] = frozenset()
+    ) -> None:
         """Match the schedule to what is pollable, leaving existing phases alone.
 
         A key joining must never shift anyone else's clock. Newcomers are shuffled
@@ -56,7 +67,12 @@ class PollSchedule:
         spacing = self._interval / (len(self._due) + len(newcomers))
         now = monotonic()
         for slot, key in enumerate(newcomers, start=1):
-            self._due[key] = now + slot * spacing
+            # Capped at the key's own gap: a hot newcomer laid out on the
+            # 90 s lattice would sit out five gaps before its first poll.
+            self._due[key] = now + min(slot * spacing, self._interval_for(key))
+
+        self._hot = frozenset(hot) & keys
+        self._pull_forward()
 
     def seconds_until_due(self) -> float:
         """How long until the earliest key comes due.
@@ -83,22 +99,46 @@ class PollSchedule:
         """
         now = monotonic()
         for key in keys:
-            if key in self._due:
-                self._due[key] = self._spread(key, now + self._jittered())
+            if key not in self._due:
+                continue
+            proposal = now + self._jittered(key)
+            # Hot keys skip the spread: it compares phases against ONE modulus
+            # and is undefined across two, and a key polling every 15 s is not
+            # the slow metronomic traffic the spread exists to break up.
+            self._due[key] = (
+                proposal if key in self._hot else self._spread(key, proposal)
+            )
 
-    def _jittered(self) -> float:
-        return self._interval * random.uniform(1 - JITTER, 1 + JITTER)
+    def _interval_for(self, key: PollKey) -> float:
+        return HOT_INTERVAL if key in self._hot else self._interval
+
+    def _jittered(self, key: PollKey) -> float:
+        return self._interval_for(key) * random.uniform(1 - JITTER, 1 + JITTER)
+
+    def _pull_forward(self) -> None:
+        """Bring a key that just went hot forward to its new gap.
+
+        A round opening must not wait out the 90 s slot the key already held,
+        or its first hot poll lands after a fifth of the window is gone.
+        """
+        now = monotonic()
+        horizon = now + HOT_INTERVAL
+        for key in self._hot:
+            if key in self._due and self._due[key] > horizon:
+                self._due[key] = now + random.uniform(0, HOT_INTERVAL)
 
     def _spread(self, key: PollKey, proposal: float) -> float:
         """Nudge one key's proposed due time toward the middle of its own gap.
 
         Neighbours compared by PHASE (offset modulo the interval), not absolute
         due time -- see wiki/gotchas/d-poll-schedule-absolute-vs-phase.md.
+        Hot keys are left out of the comparison as well as skipped by it: they
+        run on a different modulus, so their phases say nothing here.
         """
         offsets = [
             (due - proposal) % self._interval
             for other, due in self._due.items()
-            if other != key
+            if other != key and other not in self._hot
         ]
         if not offsets:
             return proposal

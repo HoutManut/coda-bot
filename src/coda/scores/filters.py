@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coda.db.models import LiveUpdateChannel, LiveUpdatePref, PlayScore, SongDifficulty
-from coda.scores.b30 import B30Service
+from coda.scores.potential import PotentialService
 from coda.utils.scoring import PURE_MEMORY, Grade, grade_of
 
 
@@ -87,12 +87,12 @@ class PlayFacts:
     def __init__(
         self,
         db: AsyncSession,
-        b30: B30Service,
+        potential: PotentialService,
         row: PlayScore,
         chart: SongDifficulty | None,
     ) -> None:
         self._db = db
-        self._b30 = b30
+        self._potential = potential
         self._row = row
         self._chart = chart
         self._previous_best: int | None = None
@@ -153,7 +153,7 @@ class PlayFacts:
         self._rank_loaded = True
         if self._chart is None:
             return None
-        result = await self._b30.compute(
+        result = await self._potential.compute(
             self._db,
             self._row.arcaea_account_id,
             rank_for_difficulty_id=self._chart.id,

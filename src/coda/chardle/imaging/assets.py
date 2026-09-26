@@ -21,6 +21,10 @@ CHARDLE_DIR = Path("assets/chardle")
 CAP = 80
 JACKET_SIZE = 168
 
+# Songs whose plate art already contains their jacket and title, so the row
+# draws neither and leaves the space to the art (Ember's in-game presentation).
+BAKED_IN = frozenset({"ember"})
+
 _WASH_NAMES: dict[Color, str] = {
     Color.GREEN: "green",
     Color.YELLOW: "yellow",
@@ -39,11 +43,23 @@ def header(width: int) -> Image.Image:
     return stretch(load("header.png"), width)
 
 
-def plate(side: int, *, beyond: bool) -> Image.Image:
-    """The row backing for one side. Lephon (side 3) has no art of its own and
-    Colorless has no Beyond variant, so ``3.png``/``2_BYD.png``/``3_BYD.png``
-    are copies of the plain Colorless plate."""
-    return load(f"{side}{'_BYD' if beyond else ''}.png")
+def plate(song_id: str, side: int, *, beyond: bool, alt: bool) -> Image.Image:
+    """The row backing for one chart, which the side alone does not decide."""
+    if song_id in BAKED_IN:
+        return load(f"{song_id}.png")
+    if alt:
+        return load("ins.png")
+    return load(_side_plate(side, beyond))
+
+
+@lru_cache(maxsize=None)
+def _side_plate(side: int, beyond: bool) -> str:
+    """Only sides that actually have Beyond charts ship a ``_BYD`` plate; the
+    rest fall back rather than keeping a copy of the plain one per side."""
+    beyond_name = f"{side}_BYD.png"
+    if beyond and (CHARDLE_DIR / beyond_name).exists():
+        return beyond_name
+    return f"{side}.png"
 
 
 def stand() -> Image.Image:
