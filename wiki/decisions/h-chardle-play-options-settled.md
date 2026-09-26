@@ -4,7 +4,7 @@ status: active
 date: 2026-07-30
 reverses:
 created: 2026-07-30
-updated: 2026-07-30
+updated: 2026-09-26
 tags: [decision, chardle, commands]
 aliases: ["/chardle play option rework: side hidden, random tier weighted, columns count-only"]
 ---
@@ -45,9 +45,11 @@ settled all three plus one ordering tweak, and the changes were built the same s
   existing ambient/event `roll_err` chance in `PuzzleService.free`, applied after tier
   resolution regardless of how the tier was picked, so random-tier needed no new err handling.
 - **Columns**: count only, not explicit choice. New `columns` integer option on `Play`
-  (`min_value=3, max_value=8, default=MAX_COLUMNS`). `8` is the structural ceiling:
-  `TITLE` (mandatory) + one winner from each of the two `REDUNDANT_GROUPS` pairs + all 5
-  `_FILLERS`. Threads through as `max_columns`: `Play.invoke` → `PuzzleService.free` → `_draw`
+  (`min_value=3, max_value=8, default=MAX_COLUMNS`). `8` was the structural ceiling when this
+  was decided (`TITLE` + one winner from each of two `REDUNDANT_GROUPS` pairs + 5 `_FILLERS`).
+  Since `(BPM, NOTE)` became a third redundant group, the ceiling is **7** — `TITLE` + three
+  group winners + the 3 remaining `_FILLERS` (`ARTIST`, `CHARTER`, `SIDE`) — which equals
+  `MAX_COLUMNS`. The option still accepts 8; `select_columns` clamps it. Threads through as `max_columns`: `Play.invoke` → `PuzzleService.free` → `_draw`
   → `columns.select_columns`. `select_columns` still clamps to what `_informative` actually
   supports for that pool/answer — the option sets a target ceiling, not a guarantee.
 - **`room`**: moved to `Play`'s first option (was last).

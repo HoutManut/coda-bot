@@ -4,7 +4,7 @@ status: open
 blocks: ["1v1 module build"]
 source:
 created: 2026-07-30
-updated: 2026-07-30
+updated: 2026-09-26
 tags: [question, unbuilt, brainstorm, tournaments]
 aliases: ["What should the 1v1 casual/ranked match structure look like?"]
 ---
@@ -14,20 +14,21 @@ aliases: ["What should the 1v1 casual/ranked match structure look like?"]
 ## Why it is open
 
 The owner wants an in-between step before [[tournaments|Tournaments]]: a
-standalone 1v1 mode (casual + ranked with Elo, matchmaking) that ships ahead
-of the full tournament module. Nothing in [[tournaments]] or
-[[h-tournament-bracket-and-ban-formats]] designs matchmaking or rating —
-those pages assume a roster already exists (signed up for a tournament).
-This page is the 2026-07-30 design session's sketch, same status as the
-bracket/ban page: pinned down enough to build from, not yet built, not yet
-reasoned against shipped schema.
+standalone 1v1 mode (casual + ranked with Elo, matchmaking). Nothing in
+[[tournaments]], [[tournaments-module]] or [[handoff-14-tournament-formats|handoff 14]]
+designs matchmaking or rating — they assume a roster already exists (a room
+someone opened, or a tournament someone registered for). This page is the
+2026-07-30 design session's sketch, reconciled 2026-09-26 against the
+tournament code that has since shipped: pinned down enough to build from, not
+yet built.
 
-Most of the *match-play* machinery is not new — a 1v1 reuses the `Match`/
-`Game`/`BanPhase` primitives from [[h-tournament-bracket-and-ban-formats]]
-almost unchanged (a 1v1 is a degenerate bracket: one `Match`, no WB/LB/GF
-routing). What's genuinely new is matchmaking, Elo, and a replacement for
-`best_of` game-counting: an HP-attrition match-end condition instead of
-first-to-N-game-wins.
+> [!note] Casual is mostly built already
+> `/tournament quick` with two players is a head-to-head match with pick/ban,
+> windows scored off `play_scores`, and its own thread ([[tournaments-module]]).
+> A casual 1v1 is that, reached through `/challenge` or `/queue` instead of a
+> room. What is genuinely new is matchmaking, Elo, and a replacement for
+> `best_of` game-counting: an HP-attrition match-end condition instead of
+> first-to-N-game-wins.
 
 ## Model
 
@@ -62,8 +63,10 @@ R_a' = R_a + K * (S_a - E_a)      S_a ∈ {0, 1}, no draws (HP model always has 
 
 ### Match entity
 
-Shares the table tournaments will eventually use; bracket-only fields
-(`winner_to_match_id`, `bracket`, `round_number`, ...) stay null for 1v1.
+Reuses the shipped `TournamentMatch` row (`src/coda/db/models/tournament.py`)
+rather than a new table; the bracket fields handoff 14 adds to it
+(`winner_to_match_id`, `bracket_side`, `bracket_round`, ...) stay null for a
+1v1. The fields below are what a 1v1 adds.
 
 ```
 Match
@@ -73,7 +76,8 @@ Match
   state: PENDING → [BANNING, ranked only] → IN_PROGRESS → DONE
   winner_id
 
-Game = existing round primitive (chart+window+scoring_rule, see [[tournaments]] §Encoding), plus:
+Game = the shipped `TournamentRound` (chart + window; first valid score counts —
+the scoring rule is no longer a parameter, [[h-first-score-is-the-only-rule]]), plus:
   damage_to_a, damage_to_b   # one side always 0, unless exact tie
 ```
 
@@ -99,10 +103,18 @@ near-one-shot needs live-testing to tune, not a guess made at design time.
 
 | Mode | Mechanic |
 |---|---|
-| Ranked | `BanPhase(scope=GAME)` reused as designed in [[h-tournament-bracket-and-ban-formats]] — loser-priority turn order, random auto-ban on timeout. No upfront-cadence branch: HP model has no `best_of` to ban down to, so per-game is the only cadence that applies to 1v1. |
-| Casual | Single pick, no ban negotiation — loser-priority (same ordering rule as ranked, one mental model across both modes), no full ban phase (too heavy for a quick casual match) |
-| Both | Game 1 has no loser yet — falls back to the same seed/coinflip first-turn order [[h-tournament-bracket-and-ban-formats]] already flags as a necessary reconciliation for upfront cadence |
-| Ranked pool exhaustion | Banning whittles the snapshot pool down; once 1 chart is left, stop banning and play it, repeating as needed until the match ends |
+The shipped sequence (`tournaments/pickban.py`) is two bans up front, then
+`best_of - 1` picks served between rounds, then a derived decider. Sides
+alternate by parity from a randomised first actor; an expired turn acts at
+random (`auto_pick`). It is sized by `best_of`, which the HP model does not
+have, so a 1v1 needs its own turn function — the pieces below are what differs.
+
+| Mode | Mechanic |
+|---|---|
+| Ranked | Two bans up front as shipped, then one pick per game with no fixed count. **Loser picks** the next chart, where shipped pick/ban alternates by parity — this is a deliberate 1v1 difference. Random auto-action on timeout, reused as is. |
+| Casual | Single pick per game, no bans — loser picks (same ordering rule as ranked, one mental model across both modes) |
+| Both | Game 1 has no loser yet — use the shipped randomised first actor (`match.py`), already shown on the board |
+| Ranked pool exhaustion | Picking whittles the pool down; once 1 chart is left, play it, repeating as needed until the match ends |
 
 ### Matchmaking — two entry paths, both feed the same `Match` creation
 
@@ -119,6 +131,7 @@ proximity has nothing to select from.
 
 | Case | Handling |
 |---|---|
+| `/queue` has no organizer | The pool is an explicit organizer choice (handoff 13 decision 12); a queued match has nobody to choose it, so the pool comes from the guild's `tournament_default_*` settings via `defaults.py`, same as an omitted `/tournament quick` option |
 | Exact-tie games | Chip damage both sides (not zero) — otherwise two evenly-matched players could tie forever with no forced progress |
 | Ranked chart pool exhaustion | Repeat the last remaining chart rather than expanding the pool or capping the match |
 | Alt accounts | Elo attaches to the account, not the Discord id issuing commands — already correct by construction, no new enforcement needed |
@@ -136,8 +149,7 @@ once built, same as [[tournaments]]'s settled parameters did.
 
 The shapes above are this session's pinned answer. Treat as a target, not a
 spec — re-open discussion before building, per this vault's convention for
-sketch-stage pages (same caveat [[h-tournament-bracket-and-ban-formats]]
-carries).
+sketch-stage pages.
 
 ## Answer
 

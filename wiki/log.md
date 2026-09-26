@@ -3,7 +3,7 @@ type: meta
 title: "Log"
 status: active
 created: 2026-07-21
-updated: 2026-09-06
+updated: 2026-09-26
 tags: [meta, log]
 aliases: ["Operations Log"]
 ---
@@ -11,6 +11,24 @@ aliases: ["Operations Log"]
 # Operations Log
 
 Append-only. Newest entry at the TOP.
+
+---
+
+## 2026-09-26 — local July work merged onto the tournament/7.0 commit
+
+A set of 2026-07-29/30 pages had never been committed and was merged onto `da664ec`. Remote
+won every file both sides touched. Six local pages were dropped as superseded:
+`h-tournament-scoring-rule-parameter` (reversed by [[h-first-score-is-the-only-rule]]), the
+bracket/ban sketch (handoff 14), the ownership domain page with its `world_songs` and
+passive-unlock questions ([[catalog|Catalog]] §Ownership, [[ownership-module]]), and the
+r10-omit decision (7.0 removed r10).
+
+Kept and indexed: [[h-chardle-cooldown-and-attribution]], [[h-chardle-play-options-settled]],
+[[h-chardle-play-options-rework]], [[h-chardle-shared-board-modes]],
+[[h-manual-score-import-mechanics]], [[h-1v1-casual-ranked-structure]]. The 1v1 page was
+re-pointed from the dropped sketch to the shipped `tournaments/` match, round and pick/ban
+code; the play-options pages now record the 7-column ceiling that the third redundant group
+`(BPM, NOTE)` produces. "Tenniel prototype" is now "2024 prototype" throughout.
 
 ---
 

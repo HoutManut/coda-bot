@@ -4,7 +4,7 @@ status: answered
 blocks: [chardle]
 source: design conversation 2026-07-30
 created: 2026-07-30
-updated: 2026-07-30
+updated: 2026-09-26
 tags: [question, chardle, unbuilt, commands]
 aliases: ["What should /chardle play's option set become?"]
 ---
@@ -89,7 +89,8 @@ Settled 2026-07-30, built same day. See [[h-chardle-play-options-settled]].
   explicit-tier or random, so nothing new was needed for err's interaction with random-tier).
 - Column *count* only (not explicit choice — deferred, bigger surface, still blocked on
   [[h-chardle-board-rendering]]): new `columns` integer option, `min_value=3, max_value=8`
-  (8 = structural ceiling: `TITLE` + one per `REDUNDANT_GROUPS` pair + all 5 `_FILLERS`),
+  (8 was the structural ceiling then; a third redundant group `(BPM, NOTE)` has since cut it to
+  7 — see [[h-chardle-play-options-settled]]),
   default `MAX_COLUMNS` (7). Threads through `PuzzleService.free` → `_draw` → `select_columns`
   as `max_columns`.
 - `room` (`thread`) moved to the first option on `Play`.
