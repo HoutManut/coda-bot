@@ -82,14 +82,12 @@ REGISTRY: dict[str, ConfigKey] = {
     ),
     "recent_b50_stat": ConfigKey(
         name="recent_b50_stat",
-        default="never",
+        default="b50",
         type=("never", "b50", "b60", "b100", "always"),
         guild_chain=(Scope.USER, Scope.GLOBAL),
         dm_chain=(Scope.USER, Scope.GLOBAL),
         description="How deep in your ranking /recent and your live updates show potential impact",
     ),
-    # Defaults to showing, unlike recent_b50_stat: this one prints a position
-    # and never a rating, so it reveals nothing a hidden PTT was hiding.
     "score_rank_depth": ConfigKey(
         name="score_rank_depth",
         default="b50",
