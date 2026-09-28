@@ -36,7 +36,7 @@ from coda.db.session import async_session
 from coda.players.live import LiveUpdateService
 from coda.scores import PotentialService, ObservationCache, PollCoordinator
 from coda.scores.potential_stat import StatMode, potential_stat_line
-from coda.scores.embed import PlayerIdentity, score_embed
+from coda.scores.embed import PlayerIdentity, append_line, score_embed
 from coda.scores.routing import poll_key_for
 from coda.scores.service import row_values
 from coda.scores.suppression import PostSuppressor
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 loader = lightbulb.Loader()
 
-_NOT_REGISTERED = "You're not registered yet -- run `/register` first."
+_NOT_REGISTERED = "You're not registered yet. Run `/register` first."
 _NOT_POLLED = (
     "That account isn't being tracked right now. Run `/register` again to restart it."
 )
@@ -127,21 +127,18 @@ class Recent(
                 ),
                 untracked=not tracking_enabled,
             )
-            # Read live every call, never remembered: a player who hides their
-            # PTT mid-session must stop seeing this line on the very next run.
-            rating, rating_observed = observations.latest_rating(arc_user_id)
-            line = await potential_stat_line(
-                db,
-                potential,
-                row,
-                chart,
-                mode=await _stat_mode(db, settings, ctx),
-                account_id=account_id,
-                tracking_enabled=tracking_enabled,
-                rating_visible=rating_observed and rating is not None,
+            append_line(
+                embed,
+                await potential_stat_line(
+                    db,
+                    potential,
+                    row,
+                    chart,
+                    mode=await _stat_mode(db, settings, ctx),
+                    account=account,
+                    observations=observations,
+                ),
             )
-            if line is not None:
-                embed.description = f"{embed.description}\n{line}"
             await _mark_shown(db, ctx, suppressor, row)
         # No ephemeral option to flip, and none could be added: the defer above
         # fixes the flags before ``request_refresh`` has said which play this

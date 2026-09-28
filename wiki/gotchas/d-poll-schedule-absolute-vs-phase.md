@@ -14,7 +14,7 @@ aliases: ["PollSchedule._spread comparing by absolute due time instead of phase"
 
 ## Symptom
 
-No crash, no error. Each poll key's real period slowly grows past `POLL_INTERVAL` over
+No crash, no error. Each poll key's real period slowly grows past `poll_interval` over
 hours — polling frequency silently rots. Nothing in logs points at it; it only shows up
 as accounts polling less often than configured.
 
@@ -28,7 +28,7 @@ polls once per interval and due times don't repeat within a window that short.
 neighbours, by comparing offsets. If those offsets are computed from **absolute** due
 time (`due - proposal`), the proposal reads as later than almost every neighbour, every
 time. The correction term then always pushes it later still — a one-directional bias.
-Repeated over reschedules, every key's actual period walks past `POLL_INTERVAL` and never
+Repeated over reschedules, every key's actual period walks past `poll_interval` and never
 converges back.
 
 ## The wrong fix
@@ -63,5 +63,5 @@ an evenly-spaced lattice — see module docstring, `schedule.py:1-13`).
 ## Regression signal
 
 Track a poll key's actual inter-poll gap over a long run (hours+); it should hover around
-`POLL_INTERVAL` with jitter, not trend upward. A `_spread` diff that drops the `%
+`poll_interval` with jitter, not trend upward. A `_spread` diff that drops the `%
 self._interval` on the offset computation is the tell — reject it on sight.

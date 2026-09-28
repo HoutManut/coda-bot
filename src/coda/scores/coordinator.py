@@ -23,7 +23,6 @@ import logging
 from collections.abc import Iterable
 from time import monotonic
 
-from coda.config import config
 from coda.scores.keys import PollKey
 
 logger = logging.getLogger(__name__)
@@ -51,14 +50,14 @@ class _RefreshBudget:
     """Per-key token bucket: one token per fetch that reaches the wire."""
 
     def __init__(self, rate: float, cap: float) -> None:
-        self._rate = rate
+        self.rate = rate
         self._cap = cap
         # poll key -> (tokens at last spend, monotonic time of that spend).
         self._buckets: dict[PollKey, tuple[float, float]] = {}
 
     def _level(self, key: PollKey, now: float) -> float:
         tokens, since = self._buckets.get(key, (self._cap, now))
-        return min(self._cap, tokens + (now - since) * self._rate)
+        return min(self._cap, tokens + (now - since) * self.rate)
 
     async def spend(self, key: PollKey) -> None:
         """Take a token for ``key``, waiting for one when the bucket is empty.
@@ -71,7 +70,7 @@ class _RefreshBudget:
         now = monotonic()
         level = self._level(key, now)
         if level < 1.0:
-            delay = (1.0 - level) / self._rate
+            delay = (1.0 - level) / self.rate
             logger.info("refresh budget: %s queued for %.0fs", key, delay)
             await asyncio.sleep(delay)
             now, level = monotonic(), 1.0
@@ -81,7 +80,7 @@ class _RefreshBudget:
 class PollCoordinator:
     """Coalesces on-demand refresh requests onto the poll loop's next cycle."""
 
-    def __init__(self) -> None:
+    def __init__(self, poll_interval: float) -> None:
         self._wake = asyncio.Event()
         self._done = asyncio.Condition()
         self._cycle_seq = 0
@@ -89,8 +88,17 @@ class PollCoordinator:
         self._last_covered: dict[PollKey, float] = {}
         self._pending: set[PollKey] = set()
         self._budget = _RefreshBudget(
-            _REFILLS_PER_INTERVAL / config.poll_interval, _BUDGET_CAP
+            _REFILLS_PER_INTERVAL / poll_interval, _BUDGET_CAP
         )
+
+    def set_poll_interval(self, interval: float) -> None:
+        """Re-derive the refresh budget from a new poll gap.
+
+        The poll loop pushes this, not the coordinator reading config itself:
+        this module stays free of DB, and the budget tracks the same value the
+        schedule uses.
+        """
+        self._budget.rate = _REFILLS_PER_INTERVAL / interval
 
     async def wait_for_trigger(self, timeout: float | None) -> set[PollKey] | None:
         """Sleep until the next tick or an on-demand wake, whichever is first.

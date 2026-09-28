@@ -87,6 +87,12 @@ def score_embed(
     return embed, file
 
 
+def append_line(embed: hikari.Embed, line: str | None) -> None:
+    """Add one line under the embed's body. None adds nothing."""
+    if line is not None:
+        embed.description = f"{embed.description}\n{line}"
+
+
 def _footer(live: bool, untracked: bool) -> str | None:
     """A minimal marker beside the timestamp, or None for a plain stored play."""
     marks: list[str] = []

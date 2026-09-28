@@ -2,14 +2,6 @@
 
 Not part of ``embed.py``: that renders a play from its rows alone and is shared
 with the live-update poster, while these need DB round-trips of their own.
-
-``/recent`` asks what a play DID (:func:`potential_stat_line`), ``/score`` asks
-where a chart STANDS (:func:`rank_line`). Both are cut off by the same configured
-reach, so a player who only cares about their top 50 is never told about #212.
-
-Two different numbers in the impact line, deliberately. A play inside the pool
-reports the potential itself. A play outside it reports the 50th-place PLAY
-RATING instead: the bar that play had to clear, which the average cannot tell you.
 """
 
 from __future__ import annotations
@@ -18,7 +10,8 @@ from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coda.db.models import PlayScore, SongDifficulty
+from coda.db.models import ArcaeaAccount, PlayScore, SongDifficulty
+from coda.scores.observations import ObservationCache
 from coda.scores.potential import POOL, PotentialResult, PotentialService
 from coda.utils.scoring import ASSUMED_MARK, format_rating
 
@@ -46,37 +39,44 @@ async def potential_stat_line(
     chart: SongDifficulty | None,
     *,
     mode: StatMode,
-    account_id: int,
-    tracking_enabled: bool,
-    rating_visible: bool,
+    account: ArcaeaAccount,
+    observations: ObservationCache,
 ) -> str | None:
-    """What this play did to the account's potential, or None to render nothing.
-
-    ``rating_visible`` must be False whenever the account's current PTT could
-    not be freshly confirmed as visible -- "unknown" is treated as hidden.
-    """
+    """What this play did to the account's potential, or None to render nothing."""
     if mode == "never":
         return None
     if chart is None or chart.rating <= 0:
         return None
-    if play.id is None or not tracking_enabled or not rating_visible:
+    if play.id is None or not account.tracking_enabled:
+        return None
+    if not _rating_visible(observations, account.arc_user_id):
         return None
 
     # limit=POOL is enough for every line here: the sums are independent of it,
     # and the deep rank rides along on `requested_rank` rather than the entries.
     result = await service.compute(
-        db, account_id, limit=POOL, rank_for_difficulty_id=chart.id
+        db, account.id, limit=POOL, rank_for_difficulty_id=chart.id
     )
     rank = result.requested_rank
     reach = _MODE_REACH[mode]
     if rank is None or (reach is not None and rank > reach):
         return None
     detail = (
-        await _potential_detail(db, service, account_id, play.id, result)
+        await _potential_detail(db, service, account.id, play.id, result)
         if rank <= POOL
         else _target_detail(result, rank)
     )
     return f"#**{rank}** best" + (f" · {detail}" if detail else "")
+
+
+def _rating_visible(observations: ObservationCache, arc_user_id: int) -> bool:
+    """Whether the account's PTT was freshly seen as public.
+
+    Read live every call, never remembered: a player who hides their PTT must
+    stop seeing this line on the very next render. "Unknown" counts as hidden.
+    """
+    rating, observed = observations.latest_rating(arc_user_id)
+    return observed and rating is not None
 
 
 async def rank_line(
@@ -123,9 +123,9 @@ async def _potential_detail(
     before = await service.compute(
         db, account_id, limit=POOL, exclude_score_id=play_id
     )
-    mark = ASSUMED_MARK if after.assumed_count else ""
     if before.potential == after.potential:
-        return f"PTT: **{mark}{format_rating(after.potential)}**"
+        return "PTT: **KEEP**"
+    mark = ASSUMED_MARK if after.assumed_count else ""
     delta = after.potential - before.potential
     return (
         f"PTT: {format_rating(before.potential)} → "

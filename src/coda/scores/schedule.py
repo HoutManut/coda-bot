@@ -1,6 +1,6 @@
 """PollSchedule -- when each poll key is next due. In-memory, no I/O.
 
-The unit is the KEY, not the sweep: ``POLL_INTERVAL`` is the gap between two
+The unit is the KEY, not the sweep: ``poll_interval`` is the gap between two
 polls of one account, and stays that as accounts are added. A sweep clock makes
 the realised period ``interval + cycle_duration``, so every new account silently
 stretches every existing account's gap.
@@ -46,6 +46,22 @@ class PollSchedule:
         self._interval = interval
         self._due: dict[PollKey, float] = {}
         self._hot: frozenset[PollKey] = frozenset()
+
+    def set_interval(self, interval: float) -> None:
+        """Adopt a new base gap, set at runtime through the config key.
+
+        Keys pick it up as they reschedule. A shortened gap also pulls in any
+        key still parked further out than the new one allows -- otherwise
+        going from 600 s to 60 s would sit out one last 600 s gap first.
+        """
+        if interval == self._interval:
+            return
+        self._interval = interval
+        now = monotonic()
+        horizon = now + interval * (1 + JITTER)
+        for key, due in self._due.items():
+            if key not in self._hot and due > horizon:
+                self._due[key] = now + random.uniform(0, interval)
 
     def sync(
         self, pollable: Iterable[PollKey], hot: AbstractSet[PollKey] = frozenset()

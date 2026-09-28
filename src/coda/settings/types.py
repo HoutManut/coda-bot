@@ -26,6 +26,9 @@ class ConfigKey:
     # decides where it can be written. Defaults to "user": forgetting to think
     # about it leaves a noisy picker, never a silent gate.
     audience: Literal["user", "owner"] = "user"
+    # Smallest value an "int" key accepts; None = unbounded. Enforced at parse
+    # time so a value that would break its consumer can never be stored.
+    min_value: int | None = None
 
     @property
     def settable_scopes(self) -> set[Scope]:

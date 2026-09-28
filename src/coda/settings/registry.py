@@ -11,8 +11,21 @@ REGISTRY: dict[str, ConfigKey] = {
         type=("on", "off"),
         guild_chain=(Scope.GLOBAL,),
         dm_chain=(Scope.GLOBAL,),
-        description="Periodic score polling (bot-wide)",
+        description="Periodic score polling on/off (bot-wide). /recent still refreshes when off",
         audience="owner",
+    ),
+    # The poller re-reads this every tick, so a change lands without a restart.
+    # Floored because the bot accounts are hand-made and unreplaceable; an open
+    # tournament round still polls its keys faster (scores/schedule.py).
+    "poll_interval": ConfigKey(
+        name="poll_interval",
+        default=90,
+        type="int",
+        guild_chain=(Scope.GLOBAL,),
+        dm_chain=(Scope.GLOBAL,),
+        description="Average seconds between two polls of one account (jittered +/-40%)",
+        audience="owner",
+        min_value=30,
     ),
     "timezone": ConfigKey(
         name="timezone",
@@ -73,7 +86,7 @@ REGISTRY: dict[str, ConfigKey] = {
         type=("never", "b50", "b60", "b100", "always"),
         guild_chain=(Scope.USER, Scope.GLOBAL),
         dm_chain=(Scope.USER, Scope.GLOBAL),
-        description="How deep in your ranking /recent shows potential impact",
+        description="How deep in your ranking /recent and your live updates show potential impact",
     ),
     # Defaults to showing, unlike recent_b50_stat: this one prints a position
     # and never a rating, so it reveals nothing a hidden PTT was hiding.

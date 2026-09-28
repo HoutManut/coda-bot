@@ -31,7 +31,7 @@ from coda.scores.suppression import PostSuppressor
 from coda.tournaments import cadence as tournament_cadence
 from coda.tournaments.board import BoardService
 from coda.tournaments.threads import TournamentChannelService
-from coda.settings import ConfigService
+from coda.settings import REGISTRY, ConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,8 @@ def build() -> hikari.GatewayBot:
     # Guild-scoped commands never appear in DMs -- only global ones can.
     client = lightbulb.client_from_app(bot, default_enabled_guilds=config.dev_guild_ids)
 
-    coordinator = PollCoordinator()
+    # Seeded with the default; the poll loop pushes the live value every tick.
+    coordinator = PollCoordinator(REGISTRY["poll_interval"].default)
     observations = ObservationCache()
     # Written by /recent, read by the poster: both need the same instance, so it
     # is registered for DI *and* handed to the background task, like the cache.
@@ -99,7 +100,7 @@ def build() -> hikari.GatewayBot:
             )
         )
         background_tasks.append(
-            asyncio.create_task(poster.run(posts, bot, suppressor))
+            asyncio.create_task(poster.run(posts, bot, suppressor, observations))
         )
         background_tasks.append(asyncio.create_task(reconcile.run_reconcile_loop()))
         start_discord(bot)

@@ -30,9 +30,12 @@ def parse_value(defn: ConfigKey, raw: str) -> Any:
 
     if defn.type == "int":
         try:
-            return int(raw)
+            value = int(raw)
         except ValueError:
             raise ValueError(f"**{defn.name}** takes a whole number, not `{raw}`.") from None
+        if defn.min_value is not None and value < defn.min_value:
+            raise ValueError(f"**{defn.name}** must be at least `{defn.min_value}`.")
+        return value
 
     if defn.type == "bool":
         lowered = raw.lower()

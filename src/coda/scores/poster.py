@@ -30,10 +30,12 @@ from coda.catalog.jackets import is_night
 from coda.db.models import ArcaeaAccount, PlayerLink, PlayScore, Song, SongDifficulty
 from coda.db.session import async_session
 from coda.players.live import LiveUpdateService
+from coda.scores.observations import ObservationCache
 from coda.scores.potential import PotentialService
+from coda.scores.potential_stat import potential_stat_line
 from coda.scores.filters import ChannelFloor, Filters, PlayFacts, evaluate
 from coda.catalog.spoilers import chart_spoilered
-from coda.scores.embed import PlayerIdentity, score_embed
+from coda.scores.embed import PlayerIdentity, append_line, score_embed
 from coda.scores.suppression import Destination, PostSuppressor
 from coda.settings import ConfigService
 from coda.settings.zone import effective_zone
@@ -77,7 +79,10 @@ def submit(posts: PostQueue | None, play_ids: list[int]) -> None:
 
 
 async def run(
-    posts: PostQueue, app: hikari.RESTAware, suppressor: PostSuppressor
+    posts: PostQueue,
+    app: hikari.RESTAware,
+    suppressor: PostSuppressor,
+    observations: ObservationCache,
 ) -> None:
     """Consume new plays forever and post each where its players asked.
 
@@ -98,7 +103,7 @@ async def run(
             await asyncio.sleep(random.uniform(*INITIAL_DELAY))
             batch.extend(_drain(posts))
             for play_id in batch:
-                for delivery in await _plan_play(play_id, app):
+                for delivery in await _plan_play(play_id, app, observations):
                     task = asyncio.create_task(_send(sender, delivery))
                     pending.add(task)
                     task.add_done_callback(pending.discard)
@@ -129,11 +134,13 @@ class _Delivery:
     spoiler: bool = False
 
 
-async def _plan_play(play_id: int, app: hikari.RESTAware) -> list[_Delivery]:
+async def _plan_play(
+    play_id: int, app: hikari.RESTAware, observations: ObservationCache
+) -> list[_Delivery]:
     """Everything one play should send. One bad play never stops the loop."""
     try:
         async with async_session() as db:
-            return await _plan(db, app, play_id)
+            return await _plan(db, app, observations, play_id)
     except Exception:
         logger.exception("live: planning play %s failed", play_id)
         return []
@@ -153,7 +160,10 @@ async def _send(sender: _Sender, delivery: _Delivery) -> None:
 
 
 async def _plan(
-    db: AsyncSession, app: hikari.RESTAware, play_id: int
+    db: AsyncSession,
+    app: hikari.RESTAware,
+    observations: ObservationCache,
+    play_id: int,
 ) -> list[_Delivery]:
     """Every message this play earns, deduplicated by destination.
 
@@ -173,7 +183,8 @@ async def _plan(
         return []
 
     live = LiveUpdateService()
-    facts = PlayFacts(db, PotentialService(), row, chart)
+    potential = PotentialService()
+    facts = PlayFacts(db, potential, row, chart)
     passed: dict[Destination, ChannelFloor | None] = {}
     for discord_id, _ in links:
         enabled, channel_id = await live.resolve_destination(db, discord_id)
@@ -195,12 +206,15 @@ async def _plan(
         return []
 
     player = await _identity(db, app, row.arcaea_account_id, links)
+    impact = await _impact_line(db, potential, observations, row, chart, links)
     spoiler = chart is not None and song is not None and chart_spoilered(song, chart)
     return [
         _Delivery(
             destination=destination,
             play_score_id=row.id,
-            embed=await _render(db, row, chart, song, destination, floor, player),
+            embed=await _render(
+                db, row, chart, song, destination, floor, player, impact
+            ),
             spoiler=spoiler,
         )
         for destination, floor in passed.items()
@@ -228,6 +242,7 @@ async def _render(
     destination: Destination,
     floor: ChannelFloor | None,
     player: PlayerIdentity | None,
+    impact: str | None,
 ) -> hikari.Embed:
     """The embed for one destination, on that destination's own clock.
 
@@ -255,7 +270,43 @@ async def _render(
         player=player,
         live=True,
     )
+    append_line(embed, impact)
     return embed
+
+
+async def _impact_line(
+    db: AsyncSession,
+    potential: PotentialService,
+    observations: ObservationCache,
+    row: PlayScore,
+    chart: SongDifficulty | None,
+    links: list[tuple[int, bool]],
+) -> str | None:
+    """The /recent potential line, on the OWNER's ``recent_b50_stat``.
+
+    Once per play, not per destination: it is a fact about the account, and the
+    owner is the one whose PTT it discloses -- another linked user's preference
+    must not publish it. No owner link falls back to the bot-wide value.
+    """
+    account = await db.get(ArcaeaAccount, row.arcaea_account_id)
+    if account is None:
+        return None
+    mode = await ConfigService().resolve(
+        db,
+        "recent_b50_stat",
+        guild_id=None,
+        channel_id=0,
+        user_id=_owner_of(links) or 0,
+        is_dm=True,
+    )
+    return await potential_stat_line(
+        db, potential, row, chart, mode=mode, account=account, observations=observations
+    )
+
+
+def _owner_of(links: list[tuple[int, bool]]) -> int | None:
+    """The owning Discord user among an account's links, if one exists."""
+    return next((discord_id for discord_id, owner in links if owner), None)
 
 
 async def _load_play(
@@ -303,7 +354,7 @@ async def _identity(
     publishing it to a channel is a disclosure nobody consented to by turning
     live updates on.
     """
-    owner_id = next((discord_id for discord_id, owner in links if owner), None)
+    owner_id = _owner_of(links)
     if owner_id is not None:
         identity = await _discord_identity(app, owner_id)
         if identity is not None:
@@ -333,7 +384,10 @@ async def _discord_identity(
         except hikari.HikariError:
             logger.info("live: could not fetch Discord user %s", discord_id)
             return None
-    return PlayerIdentity(name=user.display_name, avatar_url=str(user.display_avatar_url))
+    return PlayerIdentity(
+        name=user.global_name or user.username,
+        avatar_url=str(user.display_avatar_url),
+    )
 
 
 class _Sender:

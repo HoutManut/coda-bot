@@ -62,10 +62,6 @@ class Config:
     # The owner's own Arcaea friend code. Reserved: only OWNER_IDS members may
     # register it (anyone else is impersonating). None disables that guard.
     owner_friend_code: str | None
-    # Base seconds between two polls OF ONE ACCOUNT -- independent of how many
-    # accounts exist. The poller jitters heavily around it, so it is an average,
-    # not a schedule.
-    poll_interval: float
     # A max score gets a link, chosen at random from this list -- the easter
     # egg's whole point is not knowing which one lands. youtube.com/youtu.be
     # only, enforced at parse time so nothing downstream has to check. Empty
@@ -93,7 +89,6 @@ class Config:
             main_owner_id=owner_ids[0] if owner_ids else None,
             fernet_key=_require("FERNET_KEY"),
             owner_friend_code=os.environ.get("OWNER_FRIEND_CODE") or None,
-            poll_interval=float(os.environ.get("POLL_INTERVAL") or 90.0),
             max_score_urls=_youtube_urls("MAX_SCORE_URLS"),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
             log_dir=os.environ.get("LOG_DIR") or None,

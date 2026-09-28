@@ -41,7 +41,7 @@ did not previously describe. **Read the code first** — the module docstrings i
 | `reconcile(db)` / `run_reconcile_loop()` | `reconcile.py` | Backfills NULL `song_difficulty_id` every 300 s. Started in `bot.py:54` |
 | `score_embed(row, chart, song, *, locale, night)` | `embed.py` | Renders one play. Shared by `/recent`, `/score` and the live poster |
 | `best_play(db, account_id, difficulty_id)` / `scored_charts(db, account_id, ids)` | `best.py` | Personal-best reads behind `/score`: highest score on one chart (ties → earliest play), and which of a song's charts have any stored play. Both hit `ix_play_scores_account_chart_score` |
-| `potential_stat_line(...)` / `rank_line(...)` | `potential_stat.py` | The two lines appended under a score embed — `/recent`'s PTT IMPACT (gated on a freshly-confirmed visible PTT, since it prints rating values) and `/score`'s POSITION (ungated, since a rank is not a rating). Both cut off at the configured reach, `StatMode` (`never`/`b50`/`b60`/`b100`/`always`) |
+| `potential_stat_line(...)` / `rank_line(...)` | `potential_stat.py` | The two lines appended under a score embed — `/recent`'s and the live poster's PTT IMPACT (gated on tracking + a PTT freshly observed as public in `ObservationCache`, read inside the function; the poster resolves the owner's `recent_b50_stat`) and `/score`'s POSITION (ungated, since a rank is not a rating). Both cut off at the configured reach, `StatMode` (`never`/`b50`/`b60`/`b100`/`always`) |
 | `PotentialService.compute(db, account_id, limit=50) -> PotentialResult` | `potential.py` | The 7.0 model: best-50, its own top-10 counted twice, `/60`. Computed fresh on every call — no cache. Returns up to `limit` (capped 100) entries with `counted`/`doubled` flags, `pool_sum`/`top_sum`, a `.potential` property, `assumed_count`, and TBA/unresolved exclusion counts. Source-agnostic in ranking, NOT in rating: a tier-1 row's clear bonus is inferred ([[d-clear-bonus-impossible-friend-path]]). `rank_for_difficulty_id` reads one chart's place off the same sorted pass, which is what `/recent` and `/score` consume. See [[h-b30-cache-stores-sum]] |
 | `reviewable(result, mode)`, `set_clear_override(...)`, `accept_assumptions(...)` | `clears.py` | The clear-review queue behind `/potential`, and the ONLY writes to `play_scores.clear_override`. `mode` is `unconfirmed` (the queue proper) or `all` (also lists answered rows, so an override is reversible). Both writes scope on `arcaea_account_id` |
 
@@ -179,7 +179,7 @@ API, and the bot accounts are hand-made and unreplaceable ([[w-coherent-browser-
 
 Three separate mechanisms, each fixing a distinct failure:
 
-1. **Per-key interval, not a sweep clock.** `POLL_INTERVAL` is the gap between two
+1. **Per-key interval, not a sweep clock.** `poll_interval` is the gap between two
    polls *of one account*. A sweep clock makes the real period `interval +
    cycle_duration`, so every new account silently stretches everyone else's gap.
 2. **Jitter** (`JITTER = 0.4`) — no two gaps repeat.
@@ -187,7 +187,7 @@ Three separate mechanisms, each fixing a distinct failure:
    on-demand refreshes yank them, so keys cluster over hours. `_spread` compares
    neighbours by **phase (offset mod interval), not absolute due time** — measured
    absolutely the correction is one-directional and walks every period past
-   `POLL_INTERVAL`, which is the bug the module exists to fix. `CORRECTION` must stay
+   `poll_interval`, which is the bug the module exists to fix. `CORRECTION` must stay
    well below `1.0`: snapping to the midpoint converges on an evenly-spaced lattice, a
    *cleaner* fingerprint than the clustering it fixes.
 4. **Stagger** (`poller.STAGGER = 3–12 s`) between keys that came due together, so a

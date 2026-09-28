@@ -4,7 +4,7 @@ status: active
 entrypoint: coda.scores.poller.run — background task started in bot.py:52
 touches: [scores, sessions, players, catalog, settings, arcaea, db]
 created: 2026-07-22
-updated: 2026-07-22
+updated: 2026-09-26
 verified: 2026-07-22
 grade: A
 tags: [flow, scores, wire]
@@ -31,13 +31,17 @@ expressed at the coordinator level.
    - `(BOT, s.account_id)` for each `SessionPool.active()` session → always `True`
    - `(OWN, account.id)` for each `PlayerSessionProvider.poll_sessions()` →
      `account.tracking_enabled`
+   Before that, `_poll_settings()` reads the `polling` and `poll_interval` config keys
+   at `Scope.GLOBAL` in one query **every tick**, and pushes the interval into
+   `schedule.set_interval` and `coordinator.set_poll_interval` (refresh budget). No
+   restart for either; a shortened interval pulls in keys parked further out.
 2. `schedule.sync(...)` — adds newcomers at `k * interval / N` from now, shuffled, and
    drops departed keys. **A joining key never shifts an existing key's phase.**
 3. `coordinator.wait_for_trigger(schedule.seconds_until_due())` — sleep.
 4. `keys = schedule.due_keys()` (periodic) or `list(targets)` (on-demand).
-5. Periodic only: `_polling_enabled()` (`poller.py:98`) re-reads the `polling` config key
-   at `Scope.GLOBAL` **every tick** — `/run config set polling off` takes effect within
-   one interval, no restart. Off ⇒ due keys are pushed forward unpolled.
+5. Periodic only: the `polling` value read at the top of the tick gates the cycle —
+   `/run config set polling off` takes effect within one gap, no restart. Off ⇒ due
+   keys are pushed forward unpolled.
 6. `_run_cycle` — `random.shuffle(keys)` (order within a tick must not be stable), then
    per key, with `STAGGER` sleep between them on periodic ticks only.
 7. `_poll_key` — opens its **own short-lived** `async_session()` per key, dispatches on
@@ -89,11 +93,14 @@ expressed at the coordinator level.
   `PlayerSessionProvider._pollable`** — `session_for` shares that, and moving the filter
   down would break on-demand refresh for opted-out accounts.
 
+Pace is the `poll_interval` config key (default 90 s, min 30), not an env var —
+`POLL_INTERVAL` was removed 2026-09-26.
+
 ## The two off switches
 
 | Switch | Level | Stops | Read where |
 |---|---|---|---|
-| `polling` config key | bot-wide | **fetching**, periodic only | `poller._polling_enabled`, every tick |
+| `polling` config key | bot-wide | **fetching**, periodic only | `poller._poll_settings`, every tick |
 | `arcaea_accounts.tracking_enabled` | per account | **recording** | `ScoreStore.ingest` |
 
 Neither stops on-demand refresh. An opted-out account is still fetchable, which is the

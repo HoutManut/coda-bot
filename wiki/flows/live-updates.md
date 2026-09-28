@@ -4,7 +4,7 @@ status: active
 entrypoint: "poller._store -> poster.submit -> poster.run"
 touches: [scores (poller/embed/filters/poster/suppression), players (live.py), db (play_scores, live_update_channels, live_update_prefs, player_links)]
 created: 2026-07-21
-updated: 2026-07-29
+updated: 2026-09-28
 verified: 2026-07-28
 grade: A
 tags: [flow, live-updates, score-tracking, filters]
@@ -56,7 +56,7 @@ bounds volume is the **player**, not the poll key. One `/friend/me` returns a
 play per friend (`poller.py:217-221`), so a bot key can yield many plays at once
 — but any one *account* surfaces at most its single latest play per cycle of the
 key covering it, deduped across both read paths by `uq_play_identity`. With
-`POLL_INTERVAL` at 90 s (`config.py:70`) plus per-key jitter, a user's own feed
+`poll_interval` at 90 s (bot-wide config key, default) plus per-key jitter, a user's own feed
 tops out near 40 messages/hour and realistically yields far fewer.
 
 A **channel** that K users point at aggregates them, so one cycle can put up to K
@@ -107,7 +107,7 @@ once per (play, linked user) pair — while the account-level facts behind them
 | Where filters live | **Columns on `live_update_prefs`** — not `REGISTRY`, not a new table |
 | Live updates default | unchanged: `DEFAULT_ENABLED = False` (`live.py:26`) |
 | `/recent` duplicate | **Suppress**, keyed `(destination, play_score_id)` |
-| b30 aggregate in a post | **Never printed.** Filter input only |
+| Potential in a post | The `/recent` impact line, on the owner's `recent_b50_stat`, only while their PTT is freshly seen as public (§7) |
 | Unresolved chart vs a level gate | **Fail closed** — no level known, no post |
 
 Full detail on each: [[live-updates-filters|Live Updates — Filters]] (filters + storage),
@@ -125,11 +125,16 @@ Full detail on each: [[live-updates-filters|Live Updates — Filters]] (filters 
   it must learn that from the command, not from silence.
 - **A guild floor on the user's destination is shown in `/liveupdates status`.**
   A gate someone else set must never be an unexplained silence.
-- **The b30 aggregate is never printed in a live post** — filter input only. This
-  sidesteps the hidden-player leak entirely: a player who hides their PTT must
-  not have our estimate of their standing posted to a channel. The **per-chart**
-  play-rating line stays (`embed.py:93`) — it is derivable from a public score
-  plus a public CC and is not the aggregate. See [[potential|Potential]].
+- **The potential line is the `/recent` one, on the owner's `recent_b50_stat`**
+  (2026-09-28). `poster._impact_line` resolves the key for the account's
+  **owner** link — the person whose PTT it discloses — once per play, and every
+  destination gets the same line; `never` (the key's default) mutes it. It goes
+  through the same `potential_stat_line`, so the same gates hold: tracking on,
+  and the PTT **freshly observed as public** in `ObservationCache` (the poller
+  records the rating before it submits, so a post sees that cycle's value). A
+  hidden or unknown PTT prints nothing. The **per-chart** play-rating line is
+  unconditional — derivable from a public score plus a public CC. See
+  [[potential|Potential]].
 
 ---
 
@@ -183,9 +188,6 @@ not in `REGISTRY` — see [[live-updates-filters|Live Updates — Filters]] §St
   `clear_type` deserves its own pass.
 - **Guild trigger overrides.** Gates only — see
   [[live-updates-filters|Live Updates — Filters]] §The guild floor.
-- **The "+0.0x b30" delta in the embed.** Forbidden by §7 for hidden players and
-  not worth a per-player conditional yet. `B30Service.compute`'s
-  `exclude_score_id` (`b30.py:84`) already supports it whenever that changes.
 - **Backfill** of unobserved plays. Impossible on the wire — see
   [[h-backfill-worth-building]].
 

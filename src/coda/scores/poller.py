@@ -32,7 +32,6 @@ from coda.arcaea import endpoints
 from coda.arcaea.dto import ScoreResult, parse_friends, parse_me
 from coda.arcaea.errors import ArcaeaError, InvalidCredentials
 from coda.catalog.chart_resolution import resolve_chart
-from coda.config import config
 from coda.db.session import async_session
 from coda.players.session import PlayerSessionProvider
 from coda.scores.coordinator import PollCoordinator
@@ -69,26 +68,30 @@ async def run(
     app: hikari.RESTAware,
     posts: PostQueue | None = None,
     *,
-    interval: float | None = None,
     hot: Callable[[], Awaitable[set[PollKey]]] | None = None,
 ) -> None:
     """Poll forever: sleep until the earliest key is due, poll it, signal waiters.
 
-    Periodic polling is gated by the bot-wide ``polling`` config key, read fresh
-    every tick so ``/run config set polling on|off`` takes effect within one
-    interval and never needs a restart. With it off, due keys are pushed forward
-    unpolled -- the clock keeps running and no requests are spent; an on-demand
-    refresh (``/recent``) still runs, which is exactly on-demand-only.
+    Both knobs are bot-wide config keys, read fresh every tick so ``/run config
+    set`` takes effect without a restart: ``polling`` gates periodic polling,
+    ``poll_interval`` sets its pace. With polling off, due keys are pushed
+    forward unpolled -- the clock keeps running and no requests are spent; an
+    on-demand refresh (``/recent``) still runs, which is exactly on-demand-only.
 
     ``hot`` names the keys some other feature wants polled faster right now. It
     is a callable rather than a set so the loop reads it fresh each tick, and
     the poller never learns why a key is hot.
     """
-    schedule = PollSchedule(
-        config.poll_interval if interval is None else interval)
+    settings = (REGISTRY["polling"].default == "on",
+                float(REGISTRY["poll_interval"].default))
+    schedule = PollSchedule(settings[1])
     store = ScoreStore()
 
     while True:
+        settings = await _poll_settings(settings)
+        enabled, interval = settings
+        schedule.set_interval(interval)
+        coordinator.set_poll_interval(interval)
         pollable = await _pollable_keys(app)
         hot_keys = await _hot_keys(hot)
         schedule.sync(
@@ -105,7 +108,7 @@ async def run(
 
         covered: set[PollKey] = set()
         try:
-            if periodic and not await _polling_enabled():
+            if periodic and not enabled:
                 logger.debug(
                     "polling is off; skipping %d due key(s)", len(keys))
             else:
@@ -137,19 +140,26 @@ async def _hot_keys(
         return frozenset()
 
 
-async def _polling_enabled() -> bool:
-    """Whether bot-wide periodic polling is currently switched on.
+async def _poll_settings(last: tuple[bool, float]) -> tuple[bool, float]:
+    """Bot-wide ``(polling on, poll_interval seconds)`` as currently set.
 
     Read at ``Scope.GLOBAL`` directly rather than through
-    :meth:`ConfigService.resolve`: this key has no Discord context, and feeding
-    resolve a made-up channel/user id to get one would be a lie. Unset means the
-    registry default.
+    :meth:`ConfigService.resolve`: these keys have no Discord context, and
+    feeding resolve a made-up channel/user id to get one would be a lie. Unset
+    means the registry default. A failed read keeps ``last``: this loop is how
+    every score arrives, and a DB blip must not end it.
     """
-    async with async_session() as db:
-        value = await ConfigService().get_at_scope(
-            db, "polling", Scope.GLOBAL, GLOBAL_SCOPE_ID
-        )
-    return (REGISTRY["polling"].default if value is None else value) == "on"
+    try:
+        async with async_session() as db:
+            stored = await ConfigService().all_at_scope(
+                db, Scope.GLOBAL, GLOBAL_SCOPE_ID
+            )
+    except Exception:
+        logger.exception("poll settings read failed; keeping the last values")
+        return last
+    polling = stored.get("polling", REGISTRY["polling"].default)
+    interval = stored.get("poll_interval", REGISTRY["poll_interval"].default)
+    return polling == "on", float(interval)
 
 
 async def _run_cycle(

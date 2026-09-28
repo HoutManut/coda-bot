@@ -91,12 +91,6 @@ _TOS_NOTICE = (
     "project README for the full disclosure. By linking, you accept this risk."
 )
 
-_ACCOUNT_METHOD_BLOCKED = (
-    "\n\n**Account linking is temporarily disabled.** The host is running a "
-    "long testing session using only bot accounts. Use `/register` with the "
-    "friend code method for now."
-)
-
 
 def _error_message(exc: Exception) -> str:
     """Map a failure to something the user can actually act on."""
@@ -537,42 +531,34 @@ class Register(
     ) -> None:
         menu = lightbulb.components.Menu()
 
-        # Restore this on_continue when account linking reopens; swap the
-        # button below back to disabled=False, on_continue.
-        # async def on_continue(mctx: lightbulb.components.MenuContext) -> None:
-        #     if mctx.user.id != ctx.user.id:
-        #         await mctx.respond("This button isn't for you.", ephemeral=True)
-        #         return
-        #     modal = _AccountModal(svc, live)
-        #     custom_id = str(uuid.uuid4())
-        #     await mctx.respond_with_modal(
-        #         "Link your Arcaea account", custom_id, components=modal
-        #     )
-        #     mctx.stop_interacting()
-        #     await self._await_modal(modal, client, custom_id, ctx.user.id)
-
         async def on_continue(mctx: lightbulb.components.MenuContext) -> None:
-            raise AssertionError("disabled button cannot be pressed")
+            if mctx.user.id != ctx.user.id:
+                await mctx.respond("This button isn't for you.", ephemeral=True)
+                return
+            modal = _AccountModal(svc, live)
+            custom_id = str(uuid.uuid4())
+            await mctx.respond_with_modal(
+                "Link your Arcaea account", custom_id, components=modal
+            )
+            mctx.stop_interacting()
+            await self._await_modal(modal, client, custom_id, ctx.user.id)
 
         menu.add_interactive_button(
-            hikari.ButtonStyle.PRIMARY,
-            on_continue,
-            label="Link my account",
-            disabled=True,
+            hikari.ButtonStyle.PRIMARY, on_continue, label="Link my account"
         )
         await ctx.respond(
             embed=hikari.Embed(
                 title="Linking your Arcaea account",
-                description=_LINK_BENEFITS + _TOS_NOTICE + _ACCOUNT_METHOD_BLOCKED,
+                description=_LINK_BENEFITS + _TOS_NOTICE,
                 color=_COLOR_INFO,
             ),
             components=menu,
             ephemeral=True,
         )
-        # try:
-        #     await menu.attach(client, timeout=_CONSENT_TIMEOUT)
-        # except asyncio.TimeoutError:
-        #     logger.debug("link consent timed out for %s", ctx.user.id)
+        try:
+            await menu.attach(client, timeout=_CONSENT_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.debug("link consent timed out for %s", ctx.user.id)
 
     async def _await_modal(
         self,
@@ -598,7 +584,7 @@ class LinkInfo(
         await ctx.respond(
             embed=hikari.Embed(
                 title="Linking your Arcaea account",
-                description=_LINK_BENEFITS + _ACCOUNT_METHOD_BLOCKED,
+                description=_LINK_BENEFITS,
                 color=_COLOR_INFO,
             ),
             ephemeral=True,
