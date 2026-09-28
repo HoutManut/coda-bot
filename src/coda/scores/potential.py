@@ -77,6 +77,9 @@ class PotentialResult:
     # can sit far past `limit`. None when unrequested or the chart has no
     # ranked score.
     requested_rank: int | None = None
+    # The play holding that rank -- the chart's best-rated row, which is not
+    # necessarily the play that asked. None whenever requested_rank is None.
+    requested_play_score_id: int | None = None
 
     @property
     def potential(self) -> float:
@@ -117,14 +120,16 @@ class _Row:
     time_played: int
 
 
-def _rank_in(candidates: list[_Candidate], difficulty_id: int | None) -> int | None:
-    """1-based place of a chart in the already-sorted candidate list."""
+def _rank_in(
+    candidates: list[_Candidate], difficulty_id: int | None
+) -> tuple[int | None, int | None]:
+    """``(1-based place, winning play id)`` of a chart in the sorted candidates."""
     if difficulty_id is None:
-        return None
+        return None, None
     for position, candidate in enumerate(candidates, start=1):
         if candidate.chart.id == difficulty_id:
-            return position
-    return None
+            return position, candidate.play_score_id
+    return None, None
 
 
 class PotentialService:
@@ -155,6 +160,7 @@ class PotentialService:
         candidates, tba_excluded_count = self._rank(rows, charts)
 
         pool = candidates[:POOL]
+        requested_rank, requested_play = _rank_in(candidates, rank_for_difficulty_id)
         return PotentialResult(
             entries=[
                 PotentialEntry(
@@ -177,7 +183,8 @@ class PotentialService:
             ),
             tba_excluded_count=tba_excluded_count,
             unresolved_excluded_count=unresolved_excluded_count,
-            requested_rank=_rank_in(candidates, rank_for_difficulty_id),
+            requested_rank=requested_rank,
+            requested_play_score_id=requested_play,
         )
 
     def _rank(

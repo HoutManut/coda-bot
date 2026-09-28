@@ -57,6 +57,10 @@ async def potential_stat_line(
     result = await service.compute(
         db, account.id, limit=POOL, rank_for_difficulty_id=chart.id
     )
+    # A play that is not its chart's best moved nothing: the rank and PTT both
+    # belong to the older play, and printing them here would credit this one.
+    if result.requested_play_score_id != play.id:
+        return None
     rank = result.requested_rank
     reach = _MODE_REACH[mode]
     if rank is None or (reach is not None and rank > reach):
